@@ -848,6 +848,16 @@
   border-bottom: 2px solid #d1d5db !important;
 }
 
+/* Blank filler header — the collapsed-group summary value column has no label
+   (measure/metric live in rows). Strip its borders + match the header
+   background so it merges into the group header above instead of reading as an
+   empty sub-column. */
+.dd-grid .ag-header-cell.dd-h-blank {
+  background-color: #f9fafb !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Subtle divider between column groups (header only, like ux-cypher) */
 .dd-grid .ag-header-group-cell + .ag-header-group-cell {
   border-left: 1px solid #eef0f4 !important;
