@@ -1,0 +1,1481 @@
+/* Remove the Vite template's fixed-width root styling */
+#root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-inline: none;
+  text-align: left;
+}
+
+/* IA Shell */
+.ia-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family:
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.ia-topbar {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid #d9dde7;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.ia-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ia-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #4259ee, #7c3aed);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+}
+
+.ia-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: #1f2b4d;
+}
+
+.ia-brand small {
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: #7a8294;
+  margin-top: 2px;
+}
+
+.ia-topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #d9dde7;
+  margin: 0 0.25rem;
+}
+
+.ia-platform-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.ia-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  color: #7a8294;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.ia-breadcrumb strong {
+  color: #1f2937;
+}
+
+.ia-bc-home {
+  font-size: 1.1rem;
+  color: #7a8294;
+}
+
+.ia-bc-link {
+  color: #4259ee;
+  text-decoration: none;
+}
+
+.ia-bc-link:hover {
+  text-decoration: underline;
+}
+
+.ia-bc-sep {
+  color: #9ca3af;
+}
+
+.ia-topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ia-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.ia-icon-btn:hover {
+  background: #d9dde7;
+}
+
+.ia-bell {
+  font-size: 1rem;
+}
+
+.ia-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #7c3aed;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.ia-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ia-sidebar {
+  width: 48px;
+  background: #0f1b33;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0;
+  flex-shrink: 0;
+}
+
+.ia-sidebar-top,
+.ia-sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ia-sidebar-icon--logout {
+  color: #34d399;
+}
+
+.ia-sidebar-icon--logout:hover {
+  background: #14532d;
+  color: #6ee7b7;
+}
+
+.ia-sidebar-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.ia-sidebar-icon:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.ia-sidebar-icon--active {
+  background: #4259ee;
+  color: #fff;
+}
+
+.ia-sidebar-icon--active:hover {
+  background: #3649c6;
+  color: #fff;
+}
+
+.dd-app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: #eff2fa;
+  font-family:
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #1f2b4d;
+}
+
+.dd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #d9dde7;
+  background: #fff;
+}
+
+.dd-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.dd-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dd-actions button,
+.dd-view-actions button:not(.pvt-trigger-btn),
+.dd-arrangements button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.dd-actions button:hover,
+.dd-view-actions button:not(.pvt-trigger-btn):hover,
+.dd-arrangements button:hover {
+  background: #f3f4f6;
+}
+
+.dd-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dd-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #d9dde7;
+  background: #f9fafb;
+  flex-wrap: wrap;
+}
+
+.dd-arrangements {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.dd-arrangements button {
+  min-width: 2rem;
+  padding: 0.35rem 0.5rem;
+  font-weight: 500;
+}
+
+.dd-arrangements button.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.dd-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.dd-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dd-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 0 1.25rem 0.75rem;
+  gap: 1rem;
+}
+
+/* Card wrapper around the table (matches Figma) */
+.dd-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #d9dde7;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  overflow: hidden;
+}
+
+.dd-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.dd-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0d152c;
+}
+
+.dd-info-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #9ca3af;
+  cursor: help;
+}
+
+.dd-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dd-card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 30px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #d9dde7;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dd-card-action-btn:hover {
+  border-color: #c7cbd4;
+  background: #f9fafb;
+}
+
+.dd-card-action-btn--icon {
+  width: 32px;
+  padding: 0;
+  font-size: 1rem;
+  color: #7a8294;
+}
+
+.dd-card-action-btn--icon .pvt-trigger-btn {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px;
+}
+
+.dd-card-action-btn--icon .pvt-trigger-btn:hover {
+  background: transparent;
+  color: inherit;
+}
+
+/* Filter strip (matches Figma) */
+.ia-filter-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1.25rem;
+  background: #fbfbfd;
+  border-top: 1px solid #eceef2;
+  border-bottom: 1px solid #eceef2;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+}
+
+.ia-filter-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.ia-filter-applied {
+  color: #7a8294;
+  font-weight: 500;
+}
+
+/* Preset selector: pill + separate caret button */
+.ia-filter-preset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ia-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid #c9cdf0;
+  border-radius: 999px;
+  background: #f2f3fd;
+  color: #4259ee;
+  font-weight: 600;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.ia-filter-preset-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ia-filter-preset-caret:hover {
+  background: #eef0f4;
+}
+
+.ia-filter-preset-caret .ia-chevron {
+  font-size: 0.6rem;
+  color: #7a8294;
+}
+
+.ia-filter-sep {
+  width: 1px;
+  height: 20px;
+  background: #e0e2e8;
+  margin: 0 0.25rem;
+}
+
+.ia-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.ia-filter-key {
+  color: #8a91a0;
+  font-weight: 500;
+}
+
+.ia-filter-val {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: #eceefd;
+  color: #1f2b4d;
+  font-weight: 600;
+}
+
+.ia-filter-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #c9cdf0;
+  border-radius: 8px;
+  background: #fff;
+  color: #4259ee;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ia-filter-all:hover {
+  background: #eef2ff;
+}
+
+/* Footer — Back to Forecast Summary */
+.dd-footer-bar {
+  flex-shrink: 0;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #e0e3ec;
+  background: #fff;
+}
+
+.dd-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2b4d;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dd-back-btn:hover {
+  background: #f9fafb;
+  border-color: #b9c0cc;
+}
+
+.dd-back-chevron {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.dd-settings {
+  width: 260px;
+  padding: 1rem;
+  border-right: 1px solid #d9dde7;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.dd-settings h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dd-settings h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.dd-settings-dims {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dd-settings-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d9dde7;
+}
+
+.dd-metric-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dd-metric-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dd-dim-card {
+  border: 1px solid #d9dde7;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+}
+
+.dd-dim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  text-transform: capitalize;
+}
+
+.dd-dim-placement {
+  font-size: 0.75rem;
+  color: #7a8294;
+  background: #d9dde7;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+}
+
+.dd-level-title {
+  font-size: 0.75rem;
+  color: #7a8294;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.dd-level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dd-level-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dd-grid {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.dd-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1rem;
+  color: #7a8294;
+}
+
+/* Make ag-Grid menus / dropdowns readable */
+.ag-menu,
+.ag-popup .ag-menu,
+.ag-tabbed-menu,
+.ag-column-select-panel,
+.ag-filter-menu,
+.ag-filter-conditions-select-panel,
+.ag-filter-conditions-body,
+.ag-simple-filter-body-wrapper,
+.ag-select-list,
+.ag-virtual-list-viewport,
+.ag-virtual-list-item,
+.ag-list-item,
+.ag-picker-field-wrapper,
+.ag-select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d9dde7;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.ag-menu-item,
+.ag-menu-option,
+.ag-tabbed-menu .ag-tab,
+.ag-column-select-column,
+.ag-menu-option-part,
+.ag-list-item,
+.ag-virtual-list-item,
+.ag-select-list-item,
+.ag-filter-conditions-select-item,
+.ag-simple-filter {
+  color: #111827 !important;
+}
+
+.ag-menu-item:hover,
+.ag-menu-option:hover,
+.ag-column-select-column:hover,
+.ag-menu-option-wrapper:hover,
+.ag-list-item:hover,
+.ag-virtual-list-item:hover,
+.ag-select-list-item:hover,
+.ag-filter-conditions-select-item:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.ag-menu .ag-icon,
+.ag-tabbed-menu .ag-icon {
+  color: #374151 !important;
+}
+
+/* Impact-style table appearance */
+.dd-grid {
+  --ag-font-family:
+    "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --ag-font-size: 13px;
+  --ag-background-color: #ffffff;
+  --ag-foreground-color: #1f2b4d;
+  --ag-secondary-foreground-color: #60697d;
+  --ag-header-background-color: #f9fafb;
+  --ag-header-foreground-color: #1f2b4d;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-row-border-color: #d9dde7;
+  --ag-border-color: #d9dde7;
+  --ag-row-hover-color: #f4f1f9;
+  --ag-cell-horizontal-padding: 12px;
+}
+
+.dd-grid .ag-root-wrapper {
+  border: none;
+  border-radius: 0;
+}
+
+.dd-grid .ag-header {
+  border-bottom: 1px solid #d9dde7;
+}
+
+.dd-grid .ag-header-cell,
+.dd-grid .ag-header-group-cell {
+  font-weight: 600;
+  color: #1f2b4d;
+  background-color: #f9fafb;
+  border-right: 1px solid #eef0f4 !important;
+}
+
+.dd-grid .ag-header-cell-text {
+  font-weight: 600;
+}
+
+.dd-grid .ag-cell {
+  font-weight: 400;
+  color: #1f2b4d;
+  border-right: none !important;
+}
+
+.dd-grid .ag-right-aligned-cell .ag-cell-value {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.dd-grid .ag-right-aligned-header .ag-header-cell-label {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.dd-grid .ag-right-aligned-header .ag-header-cell-text {
+  text-align: right;
+}
+
+.dd-grid .ag-center-cols-viewport {
+  background-color: #f9fafb;
+}
+
+.dd-grid .ag-row {
+  border-bottom: 1px solid #d9dde7;
+}
+
+.dd-grid .ag-row-group {
+  background-color: #ffffff;
+}
+
+.dd-grid .ag-row-total {
+  background-color: #f4f1f9 !important;
+  font-weight: 600 !important;
+}
+
+.dd-grid .ag-row-total .ag-cell {
+  font-weight: 600;
+}
+
+.dd-grid .ag-icon-tree-closed,
+.dd-grid .ag-icon-tree-open,
+.dd-grid .ag-icon-tree-indeterminate,
+.dd-grid .ag-group-contracted,
+.dd-grid .ag-group-expanded {
+  color: #60697d;
+}
+
+.dd-grid .ag-cell-inline-editing {
+  background-color: #eceefd !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.dd-grid .ag-pivot-column-header .ag-header-cell-label,
+.dd-grid .ag-pivot-column-group-header .ag-header-cell-label {
+  justify-content: center;
+}
+
+.dd-grid .ag-pivot-total {
+  background-color: #f4f1f9 !important;
+  font-weight: 600 !important;
+}
+
+/* ── Alternating column-group shading ── */
+/* Uniform white value columns (match ux-cypher — no alternating banding) */
+.pvt-col-group-a,
+.pvt-col-group-b {
+  background-color: #ffffff !important;
+}
+
+.pvt-header-group-a,
+.pvt-header-group-b {
+  background-color: #f9fafb !important;
+}
+
+/* Top-level group header — bolder styling */
+.pvt-header-group-top {
+  font-weight: 700 !important;
+  border-bottom: 2px solid #d1d5db !important;
+}
+
+/* Subtle divider between column groups (header only, like ux-cypher) */
+.dd-grid .ag-header-group-cell + .ag-header-group-cell {
+  border-left: 1px solid #eef0f4 !important;
+}
+
+/* No vertical dividers between value columns in the body */
+.dd-grid .ag-cell.pvt-col-group-a + .ag-cell.pvt-col-group-b,
+.dd-grid .ag-cell.pvt-col-group-b + .ag-cell.pvt-col-group-a {
+  border-left: none !important;
+}
+
+/* Uniform row hover across value columns */
+.dd-grid .ag-row-hover .pvt-col-group-a,
+.dd-grid .ag-row-hover .pvt-col-group-b {
+  background-color: #f5f6fa !important;
+}
+
+/* Pivot Table Icon Trigger Button */
+.pvt-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  border: 1px solid #d9dde7;
+  border-radius: 0.5rem;
+  background: #fff;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.pvt-trigger-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pvt-trigger-btn:hover {
+  border-color: #4259ee;
+  color: #4259ee;
+  background: #f5f3ff;
+}
+
+/* Manual-pivot dedicated Measure column */
+.dd-grid .dd-measure-cell {
+  color: #4b5563;
+  font-weight: 500;
+  border-right: 1px solid #e2e5ea !important;
+}
+
+/* Outer inner-column (Measure/Metric) when both are in rows: merges across its
+   inner rows, with a separator only at the outer-group boundary. */
+.dd-grid .dd-outer-cell {
+  color: #4b5563;
+  font-weight: 500;
+  border-right: 1px solid #e2e5ea !important;
+  background: #fff;
+}
+.dd-grid.dd-manual .ag-row:has(.dd-grplast) .ag-cell.dd-outer-cell {
+  border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
+}
+
+/* Manual-pivot Product/Location tree column */
+.dd-grid .dd-tree-col {
+  border-right: 1px solid #e2e5ea !important;
+  background: #fff;
+  display: flex;
+  align-items: center;
+}
+.dd-grid .dd-tree-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.dd-grid .dd-tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  color: #7a8294;
+  cursor: pointer;
+  user-select: none;
+}
+.dd-grid .dd-tree-chevron--empty {
+  cursor: default;
+}
+.dd-grid .dd-tree-label {
+  font-weight: 500;
+  color: #111827;
+}
+/* Manual pivot: strip ALL horizontal row separators (class-agnostic, so it hits
+   whichever element draws them), so a node's measure rows merge into one block.
+   Column (vertical) borders are untouched. */
+.dd-grid.dd-manual .ag-row:not(.ag-header-row),
+.dd-grid.dd-manual .ag-row:not(.ag-header-row) * {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+/* Re-add a separator above the first measure row of each node (node boundary).
+   Higher specificity than the strip above, so it wins. */
+.dd-grid.dd-manual .ag-row:has(.dd-nodestart) > * {
+  border-top: 1px solid var(--ag-border-color, #dde2eb) !important;
+}
+/* Keep the per-measure-row separators only on the Measure column, so the
+   Product/tree column looks merged and value cells read as separate cards. */
+.dd-grid.dd-manual .ag-row:has(.dd-tnl) .ag-cell.dd-measure-cell {
+  border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
+}
+/* Close the LAST node: the boundary line for the pinned tree/measure columns is
+   normally drawn as the border-top of the next node's first row. The final node
+   has no following row, so re-add a bottom border on the grid's last row. */
+.dd-grid.dd-manual .ag-row.ag-row-last > * {
+  border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Figma table styling
+   • Value cells are plain (no inner card/box), right-aligned, separated by
+     light column grid lines.
+   • Product/Location and Measure columns are white.
+   ────────────────────────────────────────────────────────────── */
+
+/* White track behind the scrolling value cells */
+.dd-grid .ag-center-cols-viewport,
+.dd-grid .ag-body-viewport {
+  background-color: #ffffff;
+}
+
+/* Plain value cells: value fills the cell (no inner card/box), right-aligned,
+   separated only by the light column grid lines. */
+.dd-grid .ag-cell.ag-right-aligned-cell,
+.dd-grid.dd-manual .ag-row .ag-cell.ag-right-aligned-cell {
+  background-color: #ffffff !important;
+  border: none !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
+  box-shadow: none;
+  border-radius: 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.dd-grid .ag-right-aligned-cell .ag-cell-value {
+  width: 100%;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* Product / Location tree column & Measure column — white to match Figma */
+.dd-grid .dd-tree-col,
+.dd-grid .dd-measure-cell {
+  background-color: #ffffff !important;
+}
+
+/* Alternating hierarchy-group banding (subtle gray band per group) */
+.dd-grid .ag-row.dd-group-alt .ag-cell,
+.dd-grid.dd-manual .ag-row.dd-group-alt .ag-cell {
+  background-color: #f7f7fb !important;
+}
+
+/* Editable-style unit cells: always show a white rounded input box */
+.dd-grid .ag-cell.dd-input-cell,
+.dd-grid.dd-manual .ag-row .ag-cell.dd-input-cell,
+.dd-grid.dd-manual .ag-row.dd-group-alt .ag-cell.dd-input-cell {
+  background-color: #ffffff !important;
+  border: 5px solid transparent !important;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px #d9dde7;
+  border-radius: 6px;
+}
+
+/* Focused / active editable cell — blue ring to match ux-cypher */
+.dd-grid .ag-cell.dd-input-cell:focus-within,
+.dd-grid .ag-cell.dd-input-cell.ag-cell-focus {
+  box-shadow: inset 0 0 0 1.5px #4259ee !important;
+}
+
+/* Info icon before each value-column header label */
+.dd-grid .ag-header-cell.ag-right-aligned-header .ag-header-cell-label {
+  justify-content: flex-start;
+}
+.dd-grid .ag-header-cell.ag-right-aligned-header .ag-header-cell-text::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  opacity: 0.55;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E")
+    no-repeat center / contain;
+}
+
+/* Right Drawer */
+.pvt-drawer {
+  position: relative;
+  width: 700px;
+  min-width: 380px;
+  align-self: stretch;
+  overflow-y: auto;
+  background: #fff;
+  border-left: 1px solid #d9dde7;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.pvt-close-btn {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #7a8294;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: background 0.15s;
+}
+
+.pvt-close-btn:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+/* Panel */
+.pvt-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pvt-panel-header {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #d9dde7;
+}
+
+.pvt-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pvt-panel-body {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.pvt-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.pvt-section-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #1f2937;
+}
+
+.pvt-section-hint {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Available dimension chips */
+.pvt-avail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pvt-avail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #7a8294;
+  cursor: grab;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.pvt-avail-chip:not(.pvt-avail-chip--assigned):hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+  color: #3649c6;
+}
+
+.pvt-avail-chip--assigned {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Zones layout — side by side matching Figma */
+.pvt-zones-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.pvt-drop-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #d9dde7;
+  border-radius: 0.5rem;
+  min-height: 80px;
+  transition: all 0.15s;
+}
+
+.pvt-drop-zone.over {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.pvt-drop-zone-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7a8294;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+.pvt-drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pvt-drop-zone-empty {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.pvt-drop-zone-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+/* Zone chips (inside Rows/Columns) */
+.pvt-zone-chip {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  background: #fff;
+  border: 1px solid #d9dde7;
+  border-radius: 0.375rem;
+}
+
+.pvt-zone-chip-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #1f2937;
+  cursor: grab;
+}
+
+.pvt-zone-chip-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background: #fff;
+  cursor: pointer;
+  color: #374151;
+  transition: border-color 0.15s;
+}
+
+.pvt-zone-chip-select:hover {
+  border-color: #4259ee;
+}
+
+.pvt-chevron {
+  font-size: 0.65rem;
+}
+
+.pvt-zone-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.pvt-zone-chip-remove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.pvt-zone-chip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+.pvt-level-tag {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 0.2rem;
+  font-weight: 500;
+}
+
+/* Level dropdown */
+.pvt-level-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  min-width: 130px;
+  margin-top: 0.25rem;
+  padding: 0.25rem;
+  background: #fff;
+  border: 1px solid #d9dde7;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.pvt-level-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.pvt-level-option:hover {
+  background: #f5f3ff;
+}
+
+/* Error message */
+.pvt-error {
+  margin: 0 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Panel footer */
+.pvt-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #d9dde7;
+  margin-top: auto;
+}
+
+.pvt-btn {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pvt-btn-secondary {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.pvt-btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.pvt-btn-primary {
+  background: #4259ee;
+  border: 1px solid #4259ee;
+  color: #fff;
+}
+
+.pvt-btn-primary:hover {
+  background: #3649c6;
+  border-color: #3649c6;
+}
+
+/* Zone chip wrapper for drop indicators */
+.pvt-zone-chip-wrapper {
+  position: relative;
+}
+
+/* Drop indicator line */
+.pvt-drop-indicator {
+  height: 2px;
+  background: #4259ee;
+  border-radius: 1px;
+  margin: 2px 0;
+  box-shadow: 0 0 4px rgba(99, 102, 241, 0.4);
+}
+
+/* Grip handle inside zone chip */
+.pvt-zone-chip-grip {
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.pvt-zone-chip:hover .pvt-zone-chip-grip {
+  color: #7a8294;
+}
+
+/* Priority badge */
+.pvt-zone-chip-priority {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #4259ee;
+  background: #eef2ff;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.2rem;
+  flex-shrink: 0;
+}
+
+/* Reorder buttons container */
+.pvt-zone-chip-reorder {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pvt-reorder-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 12px;
+  border: none;
+  background: transparent;
+  font-size: 0.5rem;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 2px;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.1s;
+}
+
+.pvt-reorder-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  color: #4259ee;
+}
+
+.pvt-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Priority hint text in drop zone */
+.pvt-drop-zone-priority-hint {
+  font-size: 0.65rem;
+  color: #9ca3af;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Make zone chip draggable cursor */
+.pvt-zone-chip {
+  cursor: grab;
+}
+
+.pvt-zone-chip:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+/* Hide expand/contract icon for MFP and LY measure group rows */
+.ag-row-no-expand .ag-group-contracted,
+.ag-row-no-expand .ag-group-expanded {
+  display: none !important;
+}

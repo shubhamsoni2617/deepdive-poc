@@ -1,0 +1,22 @@
+{
+  "name": "demandsmart-pivot-poc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "ag-grid-community": "^35.0.1",
+    "ag-grid-enterprise": "^35.0.1",
+    "ag-grid-react": "^35.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.3.1"
+  }
+}
