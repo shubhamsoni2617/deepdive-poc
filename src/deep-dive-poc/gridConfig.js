@@ -754,7 +754,14 @@ export function buildManualColDefs({
   // rolled-up summary (columnGroupShow 'closed'); when expanded they reveal the
   // nested child groups (columnGroupShow 'open'). Alternating shading is driven
   // by the outermost (level 0) value.
-  const buildColGroups = (combos, level, grpClass, cellGrpClass) => {
+  const buildColGroups = (
+    combos,
+    level,
+    grpClass,
+    cellGrpClass,
+    leafBuilder = buildMetricChildren,
+    shadeLevel0 = true,
+  ) => {
     // Group the combos by their value at this level, preserving order.
     const order = [];
     const byValue = new Map();
@@ -773,10 +780,12 @@ export function buildManualColDefs({
       const childCombos = byValue.get(v);
       const headerName = formatColValue(colLevelFields[level], v);
 
-      // Determine alternating shading from the outermost level value.
+      // Determine alternating shading from the outermost level value — unless
+      // an outer grouping (e.g. metrics) already set the shading, in which case
+      // this level inherits the classes passed down.
       let gClass = grpClass;
       let cClass = cellGrpClass;
-      if (level === 0) {
+      if (level === 0 && shadeLevel0) {
         const hash = [...String(v)].reduce((a, c) => a + c.charCodeAt(0), 0);
         const isOdd = hash % 2 === 1;
         gClass = isOdd ? "pvt-header-group-b" : "pvt-header-group-a";
@@ -784,14 +793,12 @@ export function buildManualColDefs({
       }
 
       const headerClass =
-        level === 0 ? [gClass, "pvt-header-group-top"] : [gClass];
+        level === 0 && shadeLevel0
+          ? [gClass, "pvt-header-group-top"]
+          : [gClass];
 
       if (isLast) {
-        const leafChildren = buildMetricChildren(
-          childCombos[0],
-          cClass,
-          gClass,
-        );
+        const leafChildren = leafBuilder(childCombos[0], cClass, gClass);
         // Single unlabeled value column per group (e.g. only Time in columns
         // with both Measure & Metric in rows): flatten so the group label sits
         // on the leaf column itself. Otherwise AG Grid renders a redundant,
@@ -822,15 +829,20 @@ export function buildManualColDefs({
       const prefixKey = buildManualColumnKey(
         childCombos[0].values.slice(0, level + 1),
       );
-      const summaryChildren = buildMetricChildren(
+      const summaryChildren = leafBuilder(
         { key: prefixKey },
         cClass,
         gClass,
         "closed",
       );
-      const nested = buildColGroups(childCombos, level + 1, gClass, cClass).map(
-        (g) => ({ ...g, columnGroupShow: "open" }),
-      );
+      const nested = buildColGroups(
+        childCombos,
+        level + 1,
+        gClass,
+        cClass,
+        leafBuilder,
+        false,
+      ).map((g) => ({ ...g, columnGroupShow: "open" }));
 
       return {
         headerName,
@@ -842,6 +854,46 @@ export function buildManualColDefs({
     });
   };
 
+  // Build the single leaf value column for a fixed metric + column combo (used
+  // when metrics is the outermost column group so the metric label sits on top
+  // and the other column levels — e.g. Time — nest inside it).
+  const buildSingleMetricLeaf = (
+    mk,
+    combo,
+    cellGrpClass,
+    grpClass,
+    groupShow,
+  ) => {
+    const meta = MANUAL_METRICS.find((m) => m.key === mk);
+    const isInput = mk === "slsU";
+    const col = {
+      colId: `${combo.key}__${mk}${groupShow ? `__${groupShow}` : ""}`,
+      headerName: "",
+      valueGetter: (p) => (p.data ? p.data.__cells[combo.key] || null : null),
+      valueFormatter: (p) => (p.value && meta ? meta.fmt(p.value) : ""),
+      cellDataType: false,
+      width: 120,
+      cellClass: [
+        "ag-right-aligned-cell",
+        cellGrpClass,
+        ...(isInput ? ["dd-input-cell"] : []),
+      ],
+      headerClass: ["ag-right-aligned-header", grpClass],
+    };
+    if (groupShow) col.columnGroupShow = groupShow;
+    return col;
+  };
+
+  // Metrics is the highest-priority column dimension AND there are other column
+  // levels to nest under it (e.g. Time). The default builders make metrics the
+  // innermost leaf; here we invert so each selected metric forms an outer group.
+  const metricsOuter =
+    arrangement.columns.includes("metrics") &&
+    metricsIsOutermost(arrangement) &&
+    !bothInner &&
+    !innerIsMetric &&
+    colLevelFields.length > 0;
+
   let valueGroups;
   if (colLevelFields.length === 0) {
     // No column dimensions (only metrics in columns): show the metric value
@@ -852,6 +904,29 @@ export function buildManualColDefs({
       "pvt-col-group-a",
       "pvt-header-group-a",
     );
+  } else if (metricsOuter) {
+    valueGroups = selectedMetrics.map((mk, i) => {
+      const meta = MANUAL_METRICS.find((m) => m.key === mk);
+      const isOdd = i % 2 === 1;
+      const gClass = isOdd ? "pvt-header-group-b" : "pvt-header-group-a";
+      const cClass = isOdd ? "pvt-col-group-b" : "pvt-col-group-a";
+      const leafBuilder = (combo, cGrp, gGrp, groupShow) => [
+        buildSingleMetricLeaf(mk, combo, cGrp, gGrp, groupShow),
+      ];
+      return {
+        headerName: meta?.label || mk,
+        groupId: `metric__${mk}`,
+        headerClass: [gClass, "pvt-header-group-top"],
+        children: buildColGroups(
+          colCombos,
+          0,
+          gClass,
+          cClass,
+          leafBuilder,
+          false,
+        ),
+      };
+    });
   } else {
     valueGroups = buildColGroups(colCombos, 0);
   }
