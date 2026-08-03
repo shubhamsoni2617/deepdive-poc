@@ -730,16 +730,23 @@
   --ag-font-family:
     "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  --ag-font-size: 13px;
+  --ag-font-size: 14px;
+  font-family:
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   --ag-background-color: #ffffff;
   --ag-foreground-color: #1f2b4d;
   --ag-secondary-foreground-color: #60697d;
-  --ag-header-background-color: #f9fafb;
-  --ag-header-foreground-color: #1f2b4d;
+  --ag-header-background-color: #ffffff;
+  --ag-header-foreground-color: #0d152c;
   --ag-odd-row-background-color: #ffffff;
   --ag-row-border-color: #d9dde7;
   --ag-border-color: #d9dde7;
-  --ag-row-hover-color: #f4f1f9;
+  --ag-row-hover-color: #f5f6fa;
   --ag-cell-horizontal-padding: 12px;
 }
 
@@ -756,18 +763,48 @@
 .dd-grid .ag-header-group-cell {
   font-weight: 600;
   color: #1f2b4d;
-  background-color: #f9fafb;
+  background-color: #ffffff;
   border-right: 1px solid #eef0f4 !important;
+}
+
+/* Hide AG Grid's column header menu (the 3-dots) throughout the table */
+.dd-grid .ag-header-cell-menu-button,
+.dd-grid .ag-header-menu-icon,
+.dd-grid
+  .ag-header-cell-comp-wrapper
+  .ag-header-icon.ag-header-cell-menu-button,
+.dd-grid .ag-side-button {
+  display: none !important;
 }
 
 .dd-grid .ag-header-cell-text {
   font-weight: 600;
+  font-size: 14px;
 }
 
 .dd-grid .ag-cell {
   font-weight: 400;
+  font-size: 14px;
   color: #1f2b4d;
   border-right: none !important;
+}
+
+/* Force Manrope across every cell/header text node so nothing falls back to a
+   system font (matches ux-cypher: Manrope, 14px, #1f2b4d). */
+.dd-grid .ag-cell,
+.dd-grid .ag-cell-value,
+.dd-grid .ag-header-cell,
+.dd-grid .ag-header-group-cell,
+.dd-grid .ag-header-cell-text,
+.dd-grid .ag-header-group-cell-label {
+  font-family:
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  font-size: 14px;
 }
 
 .dd-grid .ag-right-aligned-cell .ag-cell-value {
@@ -785,7 +822,7 @@
 }
 
 .dd-grid .ag-center-cols-viewport {
-  background-color: #f9fafb;
+  background-color: #ffffff;
 }
 
 .dd-grid .ag-row {
@@ -837,15 +874,40 @@
   background-color: #ffffff !important;
 }
 
-.pvt-header-group-a,
-.pvt-header-group-b {
-  background-color: #f9fafb !important;
+/* Column headers only — light #f5f6fa background. */
+.dd-grid .ag-header {
+  background-color: #f5f6fa !important;
+}
+.dd-grid .ag-header-cell,
+.dd-grid .ag-header-group-cell,
+.dd-grid .pvt-header-group-a,
+.dd-grid .pvt-header-group-b {
+  background-color: #f5f6fa !important;
 }
 
-/* Top-level group header — bolder styling */
+/* Top-level group header — mirrors impact-ui's table-v32 column-group headers:
+   centered bold label, a #c3c8d4 right hairline, and a 2px colored accent that
+   sits on the boundary BETWEEN the group-header row and the sub-header row
+   (drawn as the group cell's bottom border, which fills the full row height so
+   the accent lands on the row1/row2 divider — not at the top). The accent
+   alternates per group via the A/B band classes. */
 .pvt-header-group-top {
   font-weight: 700 !important;
-  border-bottom: 2px solid #d1d5db !important;
+  border-right: 1px solid #c3c8d4 !important;
+}
+
+.dd-grid
+  .ag-header-group-cell.pvt-header-group-top
+  .ag-header-group-cell-label {
+  justify-content: center;
+}
+
+.dd-grid .ag-header-group-cell.pvt-header-group-top.pvt-header-group-a {
+  border-bottom: 2px solid #4259ee !important;
+}
+
+.dd-grid .ag-header-group-cell.pvt-header-group-top.pvt-header-group-b {
+  border-bottom: 2px solid #e1bc29 !important;
 }
 
 /* Blank filler header — the collapsed-group summary value column has no label
@@ -853,20 +915,24 @@
    background so it merges into the group header above instead of reading as an
    empty sub-column. */
 .dd-grid .ag-header-cell.dd-h-blank {
-  background-color: #f9fafb !important;
+  background-color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
 }
 
-/* Subtle divider between column groups (header only, like ux-cypher) */
-.dd-grid .ag-header-group-cell + .ag-header-group-cell {
-  border-left: 1px solid #eef0f4 !important;
+/* Color line between grouping columns — matches ux-cypher, whose period/metric
+   groups are separated by a `1px solid var(--border)` (#d9dde7) line in both the
+   header and the body. Within-group leaf columns keep the subtle #eef0f4 line. */
+.dd-grid .ag-header-group-cell.pvt-header-group-top,
+.dd-grid .ag-header-cell.pvt-header-group-top {
+  border-left: 1px solid #d9dde7 !important;
 }
 
-/* No vertical dividers between value columns in the body */
-.dd-grid .ag-cell.pvt-col-group-a + .ag-cell.pvt-col-group-b,
-.dd-grid .ag-cell.pvt-col-group-b + .ag-cell.pvt-col-group-a {
-  border-left: none !important;
+/* Body boundary line at the first leaf of each top-level column group. Wins over
+   the border-stripping value-cell rule below via added specificity + !important. */
+.dd-grid .ag-cell.ag-right-aligned-cell.dd-grp-start,
+.dd-grid.dd-manual .ag-row .ag-cell.ag-right-aligned-cell.dd-grp-start {
+  border-left: 1px solid #d9dde7 !important;
 }
 
 /* Uniform row hover across value columns */
@@ -904,17 +970,29 @@
 
 /* Manual-pivot dedicated Measure column */
 .dd-grid .dd-measure-cell {
-  color: #4b5563;
-  font-weight: 500;
-  border-right: 1px solid #e2e5ea !important;
+  color: #1f2b4d;
+  font-weight: 400;
+  border-right: 2px solid #c3c8d4 !important;
+}
+
+/* Header dividers for the pinned label columns. The measures/data boundary uses
+   the heavy 2px --border-strong (#c3c8d4) divider like ux-cypher; the tree→
+   measure boundary uses the light 1px gridline so only one heavy divider shows,
+   matching ux-cypher. Continuous through header + body. */
+.dd-grid .ag-header-cell[col-id="ddMeasure"],
+.dd-grid .ag-header-cell[col-id="ddMetric"] {
+  border-right: 2px solid #c3c8d4 !important;
+}
+.dd-grid .ag-header-cell[col-id="ddGroupTree"] {
+  border-right: 1px solid #d9dde7 !important;
 }
 
 /* Outer inner-column (Measure/Metric) when both are in rows: merges across its
    inner rows, with a separator only at the outer-group boundary. */
 .dd-grid .dd-outer-cell {
-  color: #4b5563;
-  font-weight: 500;
-  border-right: 1px solid #e2e5ea !important;
+  color: #1f2b4d;
+  font-weight: 400;
+  border-right: 2px solid #c3c8d4 !important;
   background: #fff;
 }
 .dd-grid.dd-manual .ag-row:has(.dd-grplast) .ag-cell.dd-outer-cell {
@@ -923,7 +1001,7 @@
 
 /* Manual-pivot Product/Location tree column */
 .dd-grid .dd-tree-col {
-  border-right: 1px solid #e2e5ea !important;
+  border-right: 1px solid #d9dde7 !important;
   background: #fff;
   display: flex;
   align-items: center;
@@ -949,8 +1027,15 @@
   cursor: default;
 }
 .dd-grid .dd-tree-label {
-  font-weight: 500;
-  color: #111827;
+  font-weight: 400;
+  color: #1f2b4d;
+}
+/* Top-level (depth 0) group labels — ux-cypher renders node names at regular
+   weight (hierarchy is conveyed by indentation + chevron, not boldness), so
+   keep the same weight/color as the rest of the label columns. */
+.dd-grid .dd-tree-label--top {
+  font-weight: 400;
+  color: #1f2b4d;
 }
 /* Manual pivot: strip ALL horizontal row separators (class-agnostic, so it hits
    whichever element draws them), so a node's measure rows merge into one block.
@@ -984,19 +1069,22 @@
    • Product/Location and Measure columns are white.
    ────────────────────────────────────────────────────────────── */
 
-/* White track behind the scrolling value cells */
+/* Track behind the scrolling value cells */
 .dd-grid .ag-center-cols-viewport,
 .dd-grid .ag-body-viewport {
   background-color: #ffffff;
 }
 
 /* Plain value cells: value fills the cell (no inner card/box), right-aligned,
-   separated only by the light column grid lines. */
+   separated by light column grid lines. Every value column carries a faint
+   left gridline (matching ux-cypher's full spreadsheet grid); group boundaries
+   upgrade to the stronger --border line via .dd-grp-start below. */
 .dd-grid .ag-cell.ag-right-aligned-cell,
 .dd-grid.dd-manual .ag-row .ag-cell.ag-right-aligned-cell {
   background-color: #ffffff !important;
   border: none !important;
   border-right: none !important;
+  border-left: 1px solid #eef0f4 !important;
   border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
   box-shadow: none;
   border-radius: 0;
@@ -1011,7 +1099,7 @@
   text-align: right;
 }
 
-/* Product / Location tree column & Measure column — white to match Figma */
+/* Product / Location tree column & Measure column — white row-data cells. */
 .dd-grid .dd-tree-col,
 .dd-grid .dd-measure-cell {
   background-color: #ffffff !important;
@@ -1023,14 +1111,17 @@
   background-color: #f7f7fb !important;
 }
 
-/* Editable-style unit cells: always show a white rounded input box */
+/* Editable-style unit cells: a soft lavender wash frames a white rounded field,
+   matching ux-cypher's editable cell. The two-layer background paints white in
+   the padding box (the field) and lavender in the border box (the wash). */
 .dd-grid .ag-cell.dd-input-cell,
 .dd-grid.dd-manual .ag-row .ag-cell.dd-input-cell,
 .dd-grid.dd-manual .ag-row.dd-group-alt .ag-cell.dd-input-cell {
-  background-color: #ffffff !important;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(#eceefd, #eceefd) border-box !important;
   border: 5px solid transparent !important;
-  background-clip: padding-box;
-  box-shadow: inset 0 0 0 1px #d9dde7;
+  box-shadow: inset 0 0 0 1px #cdd3f5;
   border-radius: 6px;
 }
 
@@ -1038,22 +1129,6 @@
 .dd-grid .ag-cell.dd-input-cell:focus-within,
 .dd-grid .ag-cell.dd-input-cell.ag-cell-focus {
   box-shadow: inset 0 0 0 1.5px #4259ee !important;
-}
-
-/* Info icon before each value-column header label */
-.dd-grid .ag-header-cell.ag-right-aligned-header .ag-header-cell-label {
-  justify-content: flex-start;
-}
-.dd-grid .ag-header-cell.ag-right-aligned-header .ag-header-cell-text::before {
-  content: "";
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 5px;
-  vertical-align: -2px;
-  opacity: 0.55;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E")
-    no-repeat center / contain;
 }
 
 /* Right Drawer */

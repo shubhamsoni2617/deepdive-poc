@@ -39,7 +39,9 @@ export function buildGridOptions({
         colLevelFields,
       }),
       pivotMode: false,
-      rowHeight: 40,
+      rowHeight: 42,
+      headerHeight: 42,
+      groupHeaderHeight: 42,
       context: { onToggleManualExpand },
       getRowId: (p) => p.data.id,
       rowClassRules: {
@@ -69,7 +71,9 @@ export function buildGridOptions({
   return {
     columnDefs: buildColDefs(arrangement, levels),
     pivotMode,
-    rowHeight: 40,
+    rowHeight: 42,
+    headerHeight: 42,
+    groupHeaderHeight: 42,
     suppressExpandablePivotGroups: suppressPivotExpand,
     pivotDefaultExpanded: 0,
     groupDisplayType: compact ? "singleColumn" : "multipleColumns",

@@ -19,7 +19,6 @@ import {
   NUMERIC_CELL_CLASS,
   NUMERIC_HEADER_CLASS,
   shadeByIndex,
-  shadeByValue,
 } from "./shading";
 
 const metricLabel = (key) => METRIC_REGISTRY[key]?.label || key;
@@ -74,7 +73,8 @@ export function buildManualColDefs({
     colId: "ddGroupTree",
     headerName: mainHeader,
     pinned: "left",
-    minWidth: 240,
+    width: 248,
+    minWidth: 248,
     suppressMovable: true,
     cellRenderer: ProductTreeCell,
     cellClassRules: {
@@ -98,8 +98,8 @@ export function buildManualColDefs({
       return kind === "measure" ? measureLabelOf(p) : metricLabelOf(p);
     },
     pinned: "left",
-    width: 140,
-    minWidth: 110,
+    width: 184,
+    minWidth: 140,
     suppressMovable: true,
     cellClass: outer ? "dd-outer-cell" : "dd-measure-cell",
     ...(outer
@@ -151,7 +151,7 @@ export function buildManualColDefs({
           valueFormatter: (p) =>
             p.value ? formatMetricValue(p.data?.metricKey, p.value) : "",
           cellDataType: false,
-          width: 120,
+          width: 100,
           cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
           headerClass: [NUMERIC_HEADER_CLASS, grpClass],
         }),
@@ -173,7 +173,7 @@ export function buildManualColDefs({
           valueFormatter: (p) =>
             p.value ? formatMetricValue(p.data?.metricKey, p.value) : "",
           cellDataType: false,
-          width: 120,
+          width: 100,
           cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
           headerClass: [NUMERIC_HEADER_CLASS, grpClass],
         }),
@@ -187,12 +187,8 @@ export function buildManualColDefs({
         valueGetter: (p) => (p.data ? p.data.__cells[combo.key] || null : null),
         valueFormatter: (p) => (p.value ? formatMetricValue(mk, p.value) : ""),
         cellDataType: false,
-        width: 120,
-        cellClass: [
-          NUMERIC_CELL_CLASS,
-          cellGrpClass,
-          ...(mk === "slsU" ? ["dd-input-cell"] : []),
-        ],
+        width: 100,
+        cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
         headerClass: [NUMERIC_HEADER_CLASS, grpClass],
       }),
     );
@@ -212,12 +208,8 @@ export function buildManualColDefs({
       valueGetter: (p) => (p.data ? p.data.__cells[combo.key] || null : null),
       valueFormatter: (p) => (p.value ? formatMetricValue(mk, p.value) : ""),
       cellDataType: false,
-      width: 120,
-      cellClass: [
-        NUMERIC_CELL_CLASS,
-        cellGrpClass,
-        ...(mk === "slsU" ? ["dd-input-cell"] : []),
-      ],
+      width: 100,
+      cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
       headerClass: [NUMERIC_HEADER_CLASS, grpClass],
     };
     if (groupShow) col.columnGroupShow = groupShow;
@@ -246,14 +238,17 @@ export function buildManualColDefs({
 
     const isLast = level === colLevelFields.length - 1;
 
-    return order.map((v) => {
+    return order.map((v, orderIdx) => {
       const childCombos = byValue.get(v);
       const headerName = formatColValue(colLevelFields[level], v);
 
       let gClass = grpClass;
       let cClass = cellGrpClass;
       if (level === 0 && shadeLevel0) {
-        const band = shadeByValue(v);
+        // Positional alternation (not value-hash) so adjacent top-level groups
+        // strictly alternate their accent underline, like ux-cypher's
+        // nth-child(even/odd) group headers.
+        const band = shadeByIndex(orderIdx);
         gClass = band.header;
         cClass = band.cell;
       }
@@ -355,6 +350,25 @@ export function buildManualColDefs({
     });
   } else {
     valueGroups = buildColGroups(colCombos, 0);
+  }
+
+  // Tag the first leaf of every top-level column group with `dd-grp-start` so
+  // the body can draw a vertical boundary line between groups (matching
+  // ux-cypher, whose group columns are separated by a --border line).
+  if (colLevelFields.length > 0) {
+    const markFirstLeaf = (col) => {
+      if (col.children && col.children.length) {
+        markFirstLeaf(col.children[0]);
+        return;
+      }
+      const cc = Array.isArray(col.cellClass)
+        ? col.cellClass
+        : col.cellClass
+          ? [col.cellClass]
+          : [];
+      if (!cc.includes("dd-grp-start")) col.cellClass = [...cc, "dd-grp-start"];
+    };
+    valueGroups.forEach(markFirstLeaf);
   }
 
   return hasRowDims

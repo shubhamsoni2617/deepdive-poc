@@ -71,7 +71,7 @@ export const DEFAULT_LEVELS = {
   [DIMENSIONS.STORE]: ["channel", "storeId"],
   [DIMENSIONS.TIME]: ["week"],
   [DIMENSIONS.MEASURES]: ["slsU", "mfp"],
-  [DIMENSIONS.METRICS]: ["aur"],
+  [DIMENSIONS.METRICS]: ["slsU", "aur"],
 };
 
 export const DIMENSION_LABELS = {

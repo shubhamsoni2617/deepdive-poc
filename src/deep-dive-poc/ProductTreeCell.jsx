@@ -38,7 +38,9 @@ export default function ProductTreeCell(params) {
       ) : (
         <span className="dd-tree-chevron dd-tree-chevron--empty" />
       )}
-      <span className="dd-tree-label">
+      <span
+        className={`dd-tree-label${depth === 0 ? " dd-tree-label--top" : ""}`}
+      >
         {data.__label != null ? String(data.__label) : ""}
       </span>
     </span>
