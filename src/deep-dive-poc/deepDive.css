@@ -1016,9 +1016,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  font-size: 10px;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
   color: #7a8294;
   cursor: pointer;
   user-select: none;
