@@ -874,6 +874,20 @@
   background-color: #ffffff !important;
 }
 
+/* When columns have more than 2 nested levels, alternate the "B" band with a
+   soft lavender fill so adjacent top-level column groups are visually distinct
+   (matches the attached PlanSmart design). */
+.dd-grid.dd-alt-cols .pvt-col-group-b {
+  background-color: #f4f3fb !important;
+}
+.dd-grid.dd-alt-cols .ag-header-group-cell.pvt-header-group-b,
+.dd-grid.dd-alt-cols .ag-header-cell.pvt-header-group-b {
+  background-color: #eeecf9 !important;
+}
+.dd-grid.dd-alt-cols .ag-row-hover .pvt-col-group-b {
+  background-color: #eceafb !important;
+}
+
 /* Column headers only — light #f5f6fa background. */
 .dd-grid .ag-header {
   background-color: #f5f6fa !important;

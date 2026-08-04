@@ -105,7 +105,7 @@ export function buildGridOptions({
     defaultColDef: {
       resizable: true,
       sortable: true,
-      filter: true,
+      filter: false,
       flex: 1,
       minWidth: 100,
     },

@@ -282,6 +282,11 @@ export default function DeepDiveApp() {
                     (arrangement.rows.includes("measures") ||
                     arrangement.rows.includes("metrics")
                       ? " dd-manual"
+                      : "") +
+                    (arrangement.columns.filter((d) => d !== "metrics").length +
+                      1 >
+                    2
+                      ? " dd-alt-cols"
                       : "")
                   }
                 >

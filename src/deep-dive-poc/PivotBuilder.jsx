@@ -153,10 +153,16 @@ function ZoneChip({
       {open && levelOptions.length > 1 && (
         <div
           className="pvt-level-dropdown"
+          draggable={false}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
         >
           {levelOptions.map((lvl) => (
-            <label key={lvl.key} className="pvt-level-option">
+            <label key={lvl.key} className="pvt-level-option" draggable={false}>
               <input
                 type="checkbox"
                 checked={selected.includes(lvl.key)}

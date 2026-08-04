@@ -22,8 +22,24 @@ import { formatMonthValue, formatPivotHeader } from "./headerFormat";
 import {
   NUMERIC_CELL_CLASS,
   NUMERIC_HEADER_CLASS,
-  shadeByValue,
+  shadeByIndex,
 } from "./shading";
+
+// Strict positional alternation for top-level column groups: record each
+// top-level pivot key in the order AG Grid emits it, then band by ordinal so
+// adjacent groups always alternate (unlike a value hash, which can collide).
+let topKeyOrder = [];
+function resetPivotShading() {
+  topKeyOrder = [];
+}
+function bandForTopKey(key) {
+  let idx = topKeyOrder.indexOf(key);
+  if (idx === -1) {
+    idx = topKeyOrder.length;
+    topKeyOrder.push(key);
+  }
+  return shadeByIndex(idx);
+}
 
 // Numeric fields that only drive value columns, never grouping.
 const measureValueFields = new Set(["mfp", "ly", "varLY"]);
@@ -138,6 +154,7 @@ export function buildDimensionColDefs(arrangement, levels) {
 }
 
 export function buildColDefs(arrangement, levels) {
+  resetPivotShading();
   const { rowFields, columnFields } = getDimensionFields(arrangement, levels);
   const dimCols = buildDimensionColDefs(arrangement, levels);
 
@@ -237,7 +254,7 @@ export function buildColDefs(arrangement, levels) {
 export function processPivotResultColDef(colDef) {
   const pivotKeys = colDef.pivotKeys || [];
   if (pivotKeys.length === 0) return;
-  const band = shadeByValue(pivotKeys[0]);
+  const band = bandForTopKey(pivotKeys[0]);
   colDef.cellClass = () => [NUMERIC_CELL_CLASS, band.cell];
   colDef.headerClass = [NUMERIC_HEADER_CLASS, band.header];
 }
@@ -247,7 +264,7 @@ export function processPivotResultColGroupDef(colGroupDef) {
   const pivotKeys = colGroupDef.pivotKeys;
   if (!pivotKeys?.length) return;
   colGroupDef.headerName = formatPivotHeader(pivotKeys[pivotKeys.length - 1]);
-  const band = shadeByValue(pivotKeys[0]);
+  const band = bandForTopKey(pivotKeys[0]);
   const isTopLevel = pivotKeys.length === 1;
   colGroupDef.headerClass = isTopLevel
     ? `${band.header} pvt-header-group-top`
