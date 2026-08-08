@@ -46,7 +46,6 @@ export function buildManualColDefs({
     (d) => d !== "measures" && d !== "metrics",
   );
   const hasRowDims = rowDims.length > 0;
-  const mainHeader = rowDims.map((d) => DIMENSION_LABELS[d] || d).join(" - ");
 
   const measuresInRows = arrangement.rows.includes("measures");
   const metricsInRows = arrangement.rows.includes("metrics");
@@ -67,23 +66,49 @@ export function buildManualColDefs({
     }))
     .filter((m) => m.dataValue);
 
-  // Pinned Product/Location tree column with fake cell-merge (label on first
-  // measure row of each node only).
-  const treeCol = {
-    colId: "ddGroupTree",
-    headerName: mainHeader,
-    pinned: "left",
-    width: 248,
-    minWidth: 248,
-    suppressMovable: true,
-    cellRenderer: ProductTreeCell,
-    cellClassRules: {
-      "dd-tnl": (p) => p.data && p.data.__isLast === false,
-      "dd-tnf": (p) => p.data && p.data.__isFirst === false,
-      "dd-nodestart": (p) => p.data && p.data.__isFirst === true,
-    },
-    cellClass: "dd-tree-col",
-  };
+  // First row dimension = drillable Product tree column. Remaining dimensions
+  // form the independent Location tree column (Total → level → level), whose
+  // labels/chevrons come from the row's location context.
+  const treeDim = rowDims[0];
+  const locationDim = rowDims[1];
+
+  const treeCols = [];
+  if (treeDim) {
+    treeCols.push({
+      colId: `ddGroupTree_${treeDim}`,
+      headerName: DIMENSION_LABELS[treeDim] || treeDim,
+      pinned: "left",
+      width: 220,
+      minWidth: 180,
+      suppressMovable: true,
+      cellRenderer: ProductTreeCell,
+      cellRendererParams: { colType: "product" },
+      cellClassRules: {
+        "dd-tnl": (p) => p.data && p.data.__isLast === false,
+        "dd-tnf": (p) => p.data && p.data.__isFirst === false,
+        "dd-nodestart": (p) => p.data && p.data.__isFirst === true,
+      },
+      cellClass: "dd-tree-col",
+    });
+  }
+  if (locationDim && manualPivot?.hasLocation) {
+    treeCols.push({
+      colId: `ddGroupTree_${locationDim}`,
+      headerName: DIMENSION_LABELS[locationDim] || locationDim,
+      pinned: "left",
+      width: 200,
+      minWidth: 160,
+      suppressMovable: true,
+      cellRenderer: ProductTreeCell,
+      cellRendererParams: { colType: "location" },
+      cellClassRules: {
+        "dd-tnl": (p) => p.data && p.data.__isLast === false,
+        "dd-tnf": (p) => p.data && p.data.__isFirst === false,
+        "dd-nodestart": (p) => p.data && p.data.__isFirst === true,
+      },
+      cellClass: "dd-tree-col",
+    });
+  }
 
   const measureLabelOf = (p) => (p.data ? p.data.measure || "" : "");
   const metricLabelOf = (p) =>
@@ -372,6 +397,6 @@ export function buildManualColDefs({
   }
 
   return hasRowDims
-    ? [treeCol, ...innerCols, ...valueGroups]
+    ? [...treeCols, ...innerCols, ...valueGroups]
     : [...innerCols, ...valueGroups];
 }

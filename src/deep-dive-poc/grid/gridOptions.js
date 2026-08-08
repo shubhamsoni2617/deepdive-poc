@@ -77,7 +77,7 @@ export function buildGridOptions({
     suppressExpandablePivotGroups: suppressPivotExpand,
     pivotDefaultExpanded: 0,
     groupDisplayType: compact ? "singleColumn" : "multipleColumns",
-    groupDefaultExpanded: 1,
+    groupDefaultExpanded: 0,
     autoGroupColumnDef: {
       ...(compact
         ? {

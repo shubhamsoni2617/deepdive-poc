@@ -1398,6 +1398,19 @@
   font-weight: 500;
 }
 
+/* Open chip lifts into its own stacking context so its level dropdown renders
+   above the chips that follow it in the same zone. */
+.pvt-zone-chip--open {
+  z-index: 50;
+}
+
+/* While open, don't dim on press (chip is draggable) so the dropdown and its
+   options stay fully opaque instead of showing the background through. */
+.pvt-zone-chip--open:active {
+  opacity: 1;
+  cursor: default;
+}
+
 /* Level dropdown */
 .pvt-level-dropdown {
   position: absolute;
@@ -1568,7 +1581,7 @@
   cursor: grab;
 }
 
-.pvt-zone-chip:active {
+.pvt-zone-chip:not(.pvt-zone-chip--open):active {
   cursor: grabbing;
   opacity: 0.7;
 }

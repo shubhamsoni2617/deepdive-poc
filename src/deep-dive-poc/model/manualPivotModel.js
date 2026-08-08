@@ -11,79 +11,107 @@
 import { buildManualColumnKey } from "../columns/columnKey";
 import { addRecordComponents, emptyComponents } from "../config/metrics";
 
-// Path-segment and cell-key separators (control chars, safe vs data values).
+// Path-segment separators (control chars, safe vs data values). LOC_MARK
+// separates the product path from the nested location path in a combined key.
 export const PATH_SEP = "\u0001";
 const CELL_SEP = "\u0002";
+export const LOC_MARK = "\u0003";
 
 export const cellKey = (pathKey, measure) => `${pathKey}${CELL_SEP}${measure}`;
 
+/** Column prefix keys for a record (every prefix so collapsed groups roll up). */
+function colKeysForRecord(r, colLevelFields) {
+  const colValues = colLevelFields.map((f) => r[f]);
+  if (colLevelFields.length === 0) return [buildManualColumnKey(colValues)];
+  const keys = [];
+  for (let n = 1; n <= colLevelFields.length; n++) {
+    keys.push(buildManualColumnKey(colValues.slice(0, n)));
+  }
+  return keys;
+}
+
+/** Aggregate a record list into { measure -> { colKey: components } }. */
+function aggregateByMeasure(records, colLevelFields) {
+  const byMeasure = {};
+  records.forEach((r) => {
+    const cbm = byMeasure[r.measure] || (byMeasure[r.measure] = {});
+    colKeysForRecord(r, colLevelFields).forEach((ck) => {
+      cbm[ck] = addRecordComponents(cbm[ck] || emptyComponents(), r);
+    });
+  });
+  return byMeasure;
+}
+
+/** Group records by a field, returning entries in stable alphabetical order. */
+function groupByField(records, field) {
+  const map = new Map();
+  const order = [];
+  records.forEach((r) => {
+    const v = r[field] ?? "";
+    if (!map.has(v)) {
+      map.set(v, []);
+      order.push(v);
+    }
+    map.get(v).push(r);
+  });
+  order.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return order.map((v) => ({ value: v, records: map.get(v) }));
+}
+
+/**
+ * Build the nested Location tree for a product node's records:
+ * a synthetic "Total" root (aggregate over all locations) whose children are
+ * the first location level (Channel), each drilling to the next (Store).
+ */
+function buildLocTree(records, locationFields, colLevelFields) {
+  const build = (recs, levelIdx, parentLocPk) => {
+    if (levelIdx >= locationFields.length) return [];
+    const field = locationFields[levelIdx];
+    return groupByField(recs, field).map(({ value, records: sub }) => ({
+      locPathKey: parentLocPk
+        ? `${parentLocPk}${PATH_SEP}${value}`
+        : String(value),
+      depth: levelIdx + 1,
+      value,
+      cellsByMeasure: aggregateByMeasure(sub, colLevelFields),
+      children: build(
+        sub,
+        levelIdx + 1,
+        parentLocPk ? `${parentLocPk}${PATH_SEP}${value}` : String(value),
+      ),
+    }));
+  };
+  return {
+    locPathKey: "",
+    depth: 0,
+    value: "Total",
+    cellsByMeasure: aggregateByMeasure(records, colLevelFields),
+    children: build(records, 0, ""),
+  };
+}
+
 /**
  * Aggregate records into the manual-pivot structures.
- * @returns { colCombos, childrenOrder, cellMap, maxDepth }
+ *
+ * The FIRST row dimension (`productFields`) is a drillable tree shown in the
+ * Product column. All remaining row dimensions (`locationFields`) form an
+ * independent Location tree nested under EVERY product node: a collapsible
+ * "Total" that expands to the first location level, then the next, etc.
+ *
+ * @returns { colCombos, productTree, hasLocation }
  */
 export function buildManualPivotModel({
   filteredRecords,
-  rowLevelFields,
+  productFields = [],
+  locationFields = [],
   colLevelFields,
 }) {
   const colComboMap = new Map(); // colKey -> ordered col field values
-  const childrenOrder = new Map(); // parentPathKey -> ordered [childValue]
-  const childSeen = new Map(); // parentPathKey -> Set(childValue)
-  const cellMap = new Map(); // cellKey -> { colKey: components }
-  const maxDepth = Math.max(1, rowLevelFields.length);
-
-  const addChild = (parentPk, value) => {
-    let seen = childSeen.get(parentPk);
-    if (!seen) {
-      seen = new Set();
-      childSeen.set(parentPk, seen);
-      childrenOrder.set(parentPk, []);
-    }
-    if (!seen.has(value)) {
-      seen.add(value);
-      childrenOrder.get(parentPk).push(value);
-    }
-  };
-
   filteredRecords.forEach((r) => {
     const colValues = colLevelFields.map((f) => r[f]);
     const colKey = buildManualColumnKey(colValues);
     if (!colComboMap.has(colKey)) colComboMap.set(colKey, colValues);
-
-    // Aggregate into every column prefix so a collapsed column group can show a
-    // rolled-up summary column.
-    const colKeys = [];
-    if (colLevelFields.length === 0) {
-      colKeys.push(colKey);
-    } else {
-      for (let n = 1; n <= colLevelFields.length; n++) {
-        colKeys.push(buildManualColumnKey(colValues.slice(0, n)));
-      }
-    }
-
-    for (let d = 1; d <= maxDepth; d++) {
-      const prefix = rowLevelFields.slice(0, d).map((f) => r[f]);
-      const value = prefix[d - 1] ?? "";
-      const parentPk = prefix.slice(0, d - 1).join(PATH_SEP);
-      const pk = prefix.join(PATH_SEP);
-      addChild(parentPk, value);
-
-      const key = cellKey(pk, r.measure);
-      let cells = cellMap.get(key);
-      if (!cells) {
-        cells = {};
-        cellMap.set(key, cells);
-      }
-      colKeys.forEach((ck) => {
-        cells[ck] = addRecordComponents(cells[ck] || emptyComponents(), r);
-      });
-    }
   });
-
-  // Stable alphabetical display order per level.
-  childrenOrder.forEach((arr) =>
-    arr.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
-  );
 
   const colCombos = Array.from(colComboMap.entries()).map(([key, values]) => ({
     key,
@@ -98,7 +126,33 @@ export function buildManualPivotModel({
     return 0;
   });
 
-  return { colCombos, childrenOrder, cellMap, maxDepth };
+  const hasLocation = locationFields.length > 0;
+
+  const buildProduct = (records, levelIdx, parentPk) => {
+    const field = productFields[levelIdx];
+    return groupByField(records, field).map(({ value, records: sub }) => {
+      const pk = parentPk ? `${parentPk}${PATH_SEP}${value}` : String(value);
+      return {
+        pathKey: pk,
+        depth: levelIdx,
+        value,
+        cellsByMeasure: aggregateByMeasure(sub, colLevelFields),
+        locTree: hasLocation
+          ? buildLocTree(sub, locationFields, colLevelFields)
+          : null,
+        children:
+          levelIdx + 1 < productFields.length
+            ? buildProduct(sub, levelIdx + 1, pk)
+            : [],
+      };
+    });
+  };
+
+  const productTree = productFields.length
+    ? buildProduct(filteredRecords, 0, "")
+    : [];
+
+  return { colCombos, productTree, hasLocation };
 }
 
 /**
@@ -116,7 +170,7 @@ export function buildManualRows({
   rowInnerDims,
 }) {
   if (!manualPivot) return null;
-  const { childrenOrder, cellMap, maxDepth } = manualPivot;
+  const { productTree, hasLocation } = manualPivot;
   const out = [];
   let nodeCounter = 0;
 
@@ -151,46 +205,71 @@ export function buildManualRows({
 
   const combos = buildCombos();
 
-  const walk = (parentPk, depth) => {
-    const children = childrenOrder.get(parentPk) || [];
-    children.forEach((value) => {
-      const pk = parentPk ? `${parentPk}${PATH_SEP}${value}` : value;
-      const hasChildren =
-        depth + 1 < maxDepth && (childrenOrder.get(pk)?.length || 0) > 0;
-      const expanded = expandedKeys.has(pk);
-      const alt = nodeCounter % 2 === 1;
-      nodeCounter += 1;
-
-      const cellsByMeasure = {};
-      orderedMeasures.forEach((m) => {
-        cellsByMeasure[m] = cellMap.get(cellKey(pk, m)) || {};
+  // Emit the inner (measure/metric) combo rows for one node, given the product
+  // + location context. `prodShow` marks the single row that carries the
+  // Product label/chevron; `locShow` (ci===0) carries the Location label.
+  const emitCombos = ({ prod, loc, prodShow }) => {
+    const cellsByMeasure = (loc || prod).cellsByMeasure || {};
+    const alt = nodeCounter % 2 === 1;
+    nodeCounter += 1;
+    combos.forEach((combo, ci) => {
+      const measure = combo.measure ?? orderedMeasures[0];
+      out.push({
+        id: `${prod.pathKey}${LOC_MARK}${loc ? loc.locPathKey : ""}${CELL_SEP}${
+          combo.measure ?? ""
+        }${CELL_SEP}${combo.metricKey ?? ""}`,
+        // Product column context
+        __prodPathKey: prod.pathKey,
+        __prodDepth: prod.depth,
+        __prodLabel: prod.value,
+        __prodHasChildren: prod.children.length > 0,
+        __prodExpanded: expandedKeys.has(prod.pathKey),
+        __prodShow: prodShow && ci === 0,
+        // Location column context
+        __hasLocation: hasLocation,
+        __locPathKey: loc ? `${prod.pathKey}${LOC_MARK}${loc.locPathKey}` : "",
+        __locDepth: loc ? loc.depth : 0,
+        __locLabel: loc ? loc.value : "",
+        __locHasChildren: loc ? loc.children.length > 0 : false,
+        __locExpanded: loc
+          ? expandedKeys.has(`${prod.pathKey}${LOC_MARK}${loc.locPathKey}`)
+          : false,
+        __locShow: ci === 0,
+        // Inner measure/metric row context
+        __isFirst: ci === 0,
+        __isLast: ci === combos.length - 1,
+        __grpFirst: combo.grpFirst,
+        __grpLast: combo.grpLast,
+        __alt: alt,
+        __cellsByMeasure: cellsByMeasure,
+        measure: combo.measure,
+        metricKey: combo.metricKey,
+        __cells: cellsByMeasure[measure] || {},
       });
-
-      combos.forEach((combo, ci) => {
-        const measure = combo.measure ?? orderedMeasures[0];
-        out.push({
-          id: `${pk}${CELL_SEP}${combo.measure ?? ""}${CELL_SEP}${
-            combo.metricKey ?? ""
-          }`,
-          __pathKey: pk,
-          __depth: depth,
-          __label: value,
-          __hasChildren: hasChildren,
-          __expanded: expanded,
-          __isFirst: ci === 0,
-          __isLast: ci === combos.length - 1,
-          __grpFirst: combo.grpFirst,
-          __grpLast: combo.grpLast,
-          __alt: alt,
-          __cellsByMeasure: cellsByMeasure,
-          measure: combo.measure,
-          metricKey: combo.metricKey,
-          __cells: cellsByMeasure[measure] || {},
-        });
-      });
-      if (expanded && hasChildren) walk(pk, depth + 1);
     });
   };
-  walk("", 0);
+
+  const walkProduct = (nodes) => {
+    (nodes || []).forEach((prod) => {
+      if (prod.locTree) {
+        // The location "Total" root's first row also carries the Product label.
+        let firstOfProduct = true;
+        const walkLoc = (locNode) => {
+          emitCombos({ prod, loc: locNode, prodShow: firstOfProduct });
+          firstOfProduct = false;
+          const locKey = `${prod.pathKey}${LOC_MARK}${locNode.locPathKey}`;
+          if (expandedKeys.has(locKey)) locNode.children.forEach(walkLoc);
+        };
+        walkLoc(prod.locTree);
+      } else {
+        emitCombos({ prod, loc: null, prodShow: true });
+      }
+      if (expandedKeys.has(prod.pathKey) && prod.children.length > 0) {
+        walkProduct(prod.children);
+      }
+    });
+  };
+
+  walkProduct(productTree);
   return out;
 }

@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { fetchDeepDiveData, saveEdits } from "./api";
-import { MEASURE_LEVEL_TO_ROW, DEFAULT_LEVELS } from "./config/dimensions";
+import {
+  MEASURE_LEVEL_TO_ROW,
+  DEFAULT_LEVELS,
+  selectedLevelsFor,
+} from "./config/dimensions";
 import { DEFAULT_ARRANGEMENT } from "./config/arrangements";
 import { METRICS } from "./config/metrics";
 import {
@@ -13,6 +17,8 @@ import { getCellFilter, updateBaseData } from "./model/edits";
 import {
   buildManualPivotModel,
   buildManualRows,
+  LOC_MARK,
+  PATH_SEP,
 } from "./model/manualPivotModel";
 import { unpivotByMetric } from "./model/unpivot";
 import { buildGridOptions } from "./grid/gridOptions";
@@ -112,14 +118,40 @@ export function useDeepDivePivot() {
     [arrangement],
   );
 
+  // First real row dimension = drillable Product tree; the rest form the
+  // independent Location tree (Total → level1 → level2) nested per product node.
+  const rowDimGroups = useMemo(
+    () =>
+      arrangement.rows
+        .filter((d) => d !== "measures" && d !== "metrics")
+        .map((dim) => ({ dim, fields: selectedLevelsFor(dim, levels) }))
+        .filter((g) => g.fields.length > 0),
+    [arrangement, levels],
+  );
+  const productFields = useMemo(
+    () => rowDimGroups[0]?.fields || [],
+    [rowDimGroups],
+  );
+  const locationFields = useMemo(
+    () => rowDimGroups.slice(1).flatMap((g) => g.fields),
+    [rowDimGroups],
+  );
+
   const manualPivot = useMemo(() => {
     if (!manualPivotActive) return null;
     return buildManualPivotModel({
       filteredRecords,
-      rowLevelFields,
+      productFields,
+      locationFields,
       colLevelFields,
     });
-  }, [manualPivotActive, filteredRecords, rowLevelFields, colLevelFields]);
+  }, [
+    manualPivotActive,
+    filteredRecords,
+    productFields,
+    locationFields,
+    colLevelFields,
+  ]);
 
   // Expand/collapse state for the manual pivot; reset when row dims change.
   const [expandedKeys, setExpandedKeys] = useState(() => new Set());
@@ -127,11 +159,108 @@ export function useDeepDivePivot() {
     setExpandedKeys(new Set());
   }, [rowLevelFields]);
 
-  const toggleManualExpand = useCallback((pathKey) => {
+  // Accordion within each level, applied independently per axis: expanding a
+  // node collapses its siblings (and their descendants) on the SAME axis, while
+  // leaving the other axis untouched. Product keys have no LOC_MARK; Location
+  // keys are `<productPath>LOC_MARK<locPath>`.
+  const toggleManualExpand = useCallback((key) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(pathKey)) next.delete(pathKey);
-      else next.add(pathKey);
+      const locIdx = key.indexOf(LOC_MARK);
+
+      if (next.has(key)) {
+        // Collapsing: also clear expand-state of all descendants so they don't
+        // reappear expanded.
+        if (locIdx === -1) {
+          // Product node: deeper product keys + any location keys beneath it.
+          for (const ek of Array.from(next)) {
+            if (
+              ek === key ||
+              ek.startsWith(key + PATH_SEP) ||
+              ek.startsWith(key + LOC_MARK)
+            ) {
+              next.delete(ek);
+            }
+          }
+        } else {
+          // Location node: itself + deeper location nodes in the same product.
+          // (Total has empty locPath, so it clears the whole location subtree.)
+          const branchPrefix = key.slice(0, locIdx) + LOC_MARK;
+          const segs = key
+            .slice(locIdx + 1)
+            .split(PATH_SEP)
+            .filter(Boolean);
+          for (const ek of Array.from(next)) {
+            if (!ek.startsWith(branchPrefix)) continue;
+            const ekSegs = ek
+              .slice(branchPrefix.length)
+              .split(PATH_SEP)
+              .filter(Boolean);
+            if (ekSegs.length < segs.length) continue;
+            if (segs.every((s, i) => ekSegs[i] === s)) next.delete(ek);
+          }
+        }
+        return next;
+      }
+
+      if (locIdx === -1) {
+        // Product axis: collapse product siblings, ignore location keys.
+        const sepIdx = key.lastIndexOf(PATH_SEP);
+        const parent = sepIdx === -1 ? "" : key.slice(0, sepIdx);
+        for (const ek of Array.from(next)) {
+          if (ek.indexOf(LOC_MARK) !== -1) continue;
+          const inBranch = parent === "" || ek.startsWith(parent + PATH_SEP);
+          if (!inBranch) continue;
+          const selfOrDesc = ek === key || ek.startsWith(key + PATH_SEP);
+          const isAnc = (key + PATH_SEP).startsWith(ek + PATH_SEP);
+          if (!selfOrDesc && !isAnc) next.delete(ek);
+        }
+        // Same row: expanding Product collapses this product's Location tree.
+        for (const ek of Array.from(next)) {
+          if (ek.startsWith(key + LOC_MARK)) next.delete(ek);
+        }
+      } else {
+        // Location axis: collapse only SAME-LEVEL sibling location nodes (and
+        // their descendants) within the SAME product node. Ancestors such as
+        // "Total" (fewer segments) are always kept.
+        const branchPrefix = key.slice(0, locIdx) + LOC_MARK;
+        const locPath = key.slice(locIdx + 1);
+
+        // Only ONE product node may have its Location tree expanded at a time:
+        // collapse every location key that belongs to a different product.
+        for (const ek of Array.from(next)) {
+          const ekLocIdx = ek.indexOf(LOC_MARK);
+          if (ekLocIdx === -1) continue;
+          if (!ek.startsWith(branchPrefix)) next.delete(ek);
+        }
+
+        // Same row: expanding Location collapses this product's Product tree.
+        const prod = key.slice(0, locIdx);
+        for (const ek of Array.from(next)) {
+          if (ek.indexOf(LOC_MARK) !== -1) continue;
+          if (ek === prod || ek.startsWith(prod + PATH_SEP)) next.delete(ek);
+        }
+
+        const segs = locPath === "" ? [] : locPath.split(PATH_SEP);
+        const level = segs.length; // Total=0, channel=1, store=2, …
+        if (level > 0) {
+          const parentPrefix = segs.slice(0, level - 1).join(PATH_SEP);
+          for (const ek of Array.from(next)) {
+            if (!ek.startsWith(branchPrefix)) continue;
+            const ekLoc = ek.slice(branchPrefix.length);
+            const ekSegs = ekLoc === "" ? [] : ekLoc.split(PATH_SEP);
+            if (ekSegs.length < level) continue; // ancestors: keep
+            const ekParent = ekSegs.slice(0, level - 1).join(PATH_SEP);
+            const ekAtLevel = ekSegs.slice(0, level).join(PATH_SEP);
+            // Same parent + same level, but a different node → sibling subtree.
+            if (ekParent === parentPrefix && ekAtLevel !== locPath) {
+              next.delete(ek);
+            }
+          }
+        }
+      }
+
+      next.add(key);
       return next;
     });
   }, []);

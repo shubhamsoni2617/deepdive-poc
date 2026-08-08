@@ -103,9 +103,9 @@ function ZoneChip({
 
   return (
     <div
-      className="pvt-zone-chip"
+      className={`pvt-zone-chip${open ? " pvt-zone-chip--open" : ""}`}
       ref={ref}
-      draggable
+      draggable={!open}
       onDragStart={(e) => onDragStart(e, dim, zone)}
       onDragOver={(e) => {
         e.preventDefault();

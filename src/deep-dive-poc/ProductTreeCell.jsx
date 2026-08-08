@@ -8,10 +8,24 @@ export default function ProductTreeCell(params) {
   const data = params?.data;
   if (!data) return null;
 
-  const depth = data.__depth || 0;
+  // Product and Location render in separate columns. Each pulls its own label,
+  // depth, chevron and expand-state from the row's per-axis context so the two
+  // hierarchies expand independently.
+  const colType = params?.colType || "product";
+  const isLocation = colType === "location";
 
-  // Fake merge: only the first measure row of a node shows the label + chevron.
-  if (!data.__isFirst) {
+  const show = isLocation ? data.__locShow : data.__prodShow;
+  const depth = (isLocation ? data.__locDepth : data.__prodDepth) || 0;
+  const label = isLocation ? data.__locLabel : data.__prodLabel;
+  const hasChildren = isLocation
+    ? data.__locHasChildren
+    : data.__prodHasChildren;
+  const expanded = isLocation ? data.__locExpanded : data.__prodExpanded;
+  const toggleKey = isLocation ? data.__locPathKey : data.__prodPathKey;
+
+  // Cell-merge: only the row that "owns" the label renders it; the rest are
+  // blank spacers (keeping the indent so borders line up).
+  if (!show) {
     return (
       <span className="dd-tree-cell" style={{ paddingLeft: depth * 16 }} />
     );
@@ -20,20 +34,20 @@ export default function ProductTreeCell(params) {
   const onToggle = (e) => {
     e.stopPropagation();
     if (params.context && params.context.onToggleManualExpand) {
-      params.context.onToggleManualExpand(data.__pathKey);
+      params.context.onToggleManualExpand(toggleKey);
     }
   };
 
   return (
     <span className="dd-tree-cell" style={{ paddingLeft: depth * 16 }}>
-      {data.__hasChildren ? (
+      {hasChildren ? (
         <span
           className="dd-tree-chevron"
           role="button"
           tabIndex={0}
           onClick={onToggle}
         >
-          {data.__expanded ? "\u25be" : "\u25b8"}
+          {expanded ? "\u25be" : "\u25b8"}
         </span>
       ) : (
         <span className="dd-tree-chevron dd-tree-chevron--empty" />
@@ -41,7 +55,7 @@ export default function ProductTreeCell(params) {
       <span
         className={`dd-tree-label${depth === 0 ? " dd-tree-label--top" : ""}`}
       >
-        {data.__label != null ? String(data.__label) : ""}
+        {label != null ? String(label) : ""}
       </span>
     </span>
   );

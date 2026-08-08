@@ -63,6 +63,8 @@ export default function DeepDiveApp() {
     save,
   } = useDeepDivePivot();
 
+  console.log(records, "szdsf", gridOptions);
+
   const handleLevelChange = (dimension, next) => {
     const order = LEVELS_BY_DIMENSION[dimension].map((l) => l.key);
     const sorted = [...next].sort(
