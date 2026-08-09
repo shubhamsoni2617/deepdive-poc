@@ -22,15 +22,12 @@ export function buildGridOptions({
   onGridReady,
   onToggleManualExpand,
 }) {
-  const {
-    measuresInRows,
-    metricsInRowsManual,
-    measureOrMetricInCols,
-    groupingColDims,
-  } = classifyArrangement(arrangement);
+  const { manualPivotActive, measureOrMetricInCols, groupingColDims } =
+    classifyArrangement(arrangement);
 
   // Manual pivot path: flat rows + cell spanning, expand/collapse handled here.
-  if ((measuresInRows || metricsInRowsManual) && manualPivot) {
+  // Active for every arrangement that has a real row dim or a value dim in rows.
+  if (manualPivotActive && manualPivot) {
     return {
       columnDefs: buildManualColDefs({
         arrangement,

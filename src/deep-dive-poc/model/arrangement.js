@@ -43,8 +43,16 @@ export function classifyArrangement(arrangement) {
   const metricsInRows = rows.includes(METRICS);
   const metricsOutermostCol = metricsIsOutermost(arrangement);
 
-  // Manual (custom) pivot: measures or metrics is a row dimension.
-  const manualPivotActive = measuresInRows || metricsInRows;
+  // Real (non value) grouping dimensions in rows — Product, Location, etc.
+  const hasRealRowDim = rows.some((d) => d !== MEASURES && d !== METRICS);
+
+  // Manual (custom) pivot: used whenever a value dim is in rows OR there is any
+  // real row dimension. This guarantees the separate Product/Location tree
+  // columns render for EVERY arrangement (incl. both value dims in columns).
+  const manualPivotActive = measuresInRows || metricsInRows || hasRealRowDim;
+  // Neither measures nor metrics is a row dim → both are column dimensions and
+  // each product/location node renders as a single row.
+  const valueDimsInCols = !measuresInRows && !metricsInRows;
   // In the manual pivot, metrics is the innermost row dim only when measures
   // is not also in rows.
   const metricsInRowsManual = metricsInRows && !measuresInRows;
@@ -65,6 +73,8 @@ export function classifyArrangement(arrangement) {
     metricsInRowsManual,
     metricsOutermostCol,
     manualPivotActive,
+    hasRealRowDim,
+    valueDimsInCols,
     innerIsMetric,
     bothInner,
     measureOrMetricInCols,

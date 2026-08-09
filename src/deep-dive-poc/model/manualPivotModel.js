@@ -23,7 +23,9 @@ export const cellKey = (pathKey, measure) => `${pathKey}${CELL_SEP}${measure}`;
 function colKeysForRecord(r, colLevelFields) {
   const colValues = colLevelFields.map((f) => r[f]);
   if (colLevelFields.length === 0) return [buildManualColumnKey(colValues)];
-  const keys = [];
+  // Always include the empty (all-time) prefix so a collapsed outer value-dim
+  // group (e.g. a collapsible Measure) can roll up across every column period.
+  const keys = [buildManualColumnKey([])];
   for (let n = 1; n <= colLevelFields.length; n++) {
     keys.push(buildManualColumnKey(colValues.slice(0, n)));
   }
@@ -59,53 +61,88 @@ function groupByField(records, field) {
 }
 
 /**
- * Build the nested Location tree for a product node's records:
- * a synthetic "Total" root (aggregate over all locations) whose children are
- * the first location level (Channel), each drilling to the next (Store).
+ * Build the nested tree for a secondary row axis (any row dimension after the
+ * first). Each axis is INDEPENDENT: it hangs a collapsible "Total" root under
+ * every node of the previous axis, and — if there is another axis after it —
+ * nests that next axis under every one of its own nodes in turn. This is what
+ * makes e.g. Time appear under every Product AND every Location level.
+ *
+ * @param records        records scoped to the parent node
+ * @param secondaryGroups array of field-lists, one per secondary axis
+ * @param groupIdx       index into `secondaryGroups` (0 = first secondary axis)
+ * @param ancestorKey    full expand-key of the parent node (axes joined by
+ *                        LOC_MARK), used to build unique per-row expand keys
+ * @returns the single "Total" root node for this axis
  */
-function buildLocTree(records, locationFields, colLevelFields) {
-  const build = (recs, levelIdx, parentLocPk) => {
-    if (levelIdx >= locationFields.length) return [];
-    const field = locationFields[levelIdx];
-    return groupByField(recs, field).map(({ value, records: sub }) => ({
-      locPathKey: parentLocPk
-        ? `${parentLocPk}${PATH_SEP}${value}`
-        : String(value),
-      depth: levelIdx + 1,
+function buildAxisTree(
+  records,
+  secondaryGroups,
+  groupIdx,
+  colLevelFields,
+  ancestorKey,
+) {
+  const fields = secondaryGroups[groupIdx];
+  const axisIdx = groupIdx + 1; // axis 0 is the Product tree
+  const hasNext = groupIdx + 1 < secondaryGroups.length;
+
+  const makeNode = (recs, path, depth, value, children) => {
+    const fullKey = `${ancestorKey}${LOC_MARK}${path}`;
+    return {
+      axisIdx,
+      fullKey,
+      depth,
       value,
-      cellsByMeasure: aggregateByMeasure(sub, colLevelFields),
-      children: build(
-        sub,
-        levelIdx + 1,
-        parentLocPk ? `${parentLocPk}${PATH_SEP}${value}` : String(value),
-      ),
-    }));
+      cellsByMeasure: aggregateByMeasure(recs, colLevelFields),
+      children,
+      // Chevron in this column reflects only same-axis children; the next axis
+      // renders in its own column with its own always-visible Total.
+      hasChildren: children.length > 0,
+      childAxis: hasNext
+        ? buildAxisTree(
+            recs,
+            secondaryGroups,
+            groupIdx + 1,
+            colLevelFields,
+            fullKey,
+          )
+        : null,
+    };
   };
-  return {
-    locPathKey: "",
-    depth: 0,
-    value: "Total",
-    cellsByMeasure: aggregateByMeasure(records, colLevelFields),
-    children: build(records, 0, ""),
+
+  const buildLevels = (recs, levelIdx, parentPath) => {
+    if (levelIdx >= fields.length) return [];
+    const field = fields[levelIdx];
+    return groupByField(recs, field).map(({ value, records: sub }) => {
+      const path = parentPath
+        ? `${parentPath}${PATH_SEP}${value}`
+        : String(value);
+      const children = buildLevels(sub, levelIdx + 1, path);
+      return makeNode(sub, path, levelIdx + 1, value, children);
+    });
   };
+
+  // Total root (depth 0, empty path) aggregating all records for this axis.
+  return makeNode(records, "", 0, "Total", buildLevels(records, 0, ""));
 }
 
 /**
  * Aggregate records into the manual-pivot structures.
  *
- * The FIRST row dimension (`productFields`) is a drillable tree shown in the
- * Product column. All remaining row dimensions (`locationFields`) form an
- * independent Location tree nested under EVERY product node: a collapsible
- * "Total" that expands to the first location level, then the next, etc.
+ * The FIRST row dimension (`axisFieldGroups[0]`) is a drillable tree shown in
+ * the Product column. Every remaining row dimension becomes its own INDEPENDENT
+ * axis (own column, own expand state), nested under every node of the axis
+ * before it — so e.g. Time is available at every Product and Location level.
  *
- * @returns { colCombos, productTree, hasLocation }
+ * @returns { colCombos, productTree, hasLocation, numAxes }
  */
 export function buildManualPivotModel({
   filteredRecords,
-  productFields = [],
-  locationFields = [],
+  axisFieldGroups = [],
   colLevelFields,
 }) {
+  const productFields = axisFieldGroups[0] || [];
+  const secondaryGroups = axisFieldGroups.slice(1);
+
   const colComboMap = new Map(); // colKey -> ordered col field values
   filteredRecords.forEach((r) => {
     const colValues = colLevelFields.map((f) => r[f]);
@@ -126,24 +163,27 @@ export function buildManualPivotModel({
     return 0;
   });
 
-  const hasLocation = locationFields.length > 0;
+  const hasLocation = secondaryGroups.length > 0;
 
   const buildProduct = (records, levelIdx, parentPk) => {
     const field = productFields[levelIdx];
     return groupByField(records, field).map(({ value, records: sub }) => {
       const pk = parentPk ? `${parentPk}${PATH_SEP}${value}` : String(value);
+      const children =
+        levelIdx + 1 < productFields.length
+          ? buildProduct(sub, levelIdx + 1, pk)
+          : [];
       return {
-        pathKey: pk,
+        axisIdx: 0,
+        fullKey: pk,
         depth: levelIdx,
         value,
         cellsByMeasure: aggregateByMeasure(sub, colLevelFields),
-        locTree: hasLocation
-          ? buildLocTree(sub, locationFields, colLevelFields)
+        children,
+        hasChildren: children.length > 0,
+        childAxis: hasLocation
+          ? buildAxisTree(sub, secondaryGroups, 0, colLevelFields, pk)
           : null,
-        children:
-          levelIdx + 1 < productFields.length
-            ? buildProduct(sub, levelIdx + 1, pk)
-            : [],
       };
     });
   };
@@ -152,13 +192,20 @@ export function buildManualPivotModel({
     ? buildProduct(filteredRecords, 0, "")
     : [];
 
-  return { colCombos, productTree, hasLocation };
+  return {
+    colCombos,
+    productTree,
+    hasLocation,
+    numAxes: axisFieldGroups.length,
+  };
 }
 
 /**
- * Flatten the manual-pivot tree into visible rows given the expand state.
- * Each dimension node emits one row per inner combo (measure and/or metric);
- * the first row carries the label + chevron and spans the rest.
+ * Flatten the manual-pivot axis trees into visible rows given the expand state.
+ * Each innermost node emits one row per inner combo (measure and/or metric).
+ * Every row carries a `__axis` array — one entry per row dimension — so each
+ * dimension renders in its own tree column with its own label/chevron/indent.
+ * A node's label shows only on the first row that belongs to it (cell-merge).
  */
 export function buildManualRows({
   manualPivot,
@@ -170,9 +217,10 @@ export function buildManualRows({
   rowInnerDims,
 }) {
   if (!manualPivot) return null;
-  const { productTree, hasLocation } = manualPivot;
+  const { productTree } = manualPivot;
   const out = [];
   let nodeCounter = 0;
+  const shown = new Set(); // fullKeys whose label has already been rendered
 
   const listFor = (dim) =>
     dim === "measures"
@@ -180,6 +228,9 @@ export function buildManualRows({
       : innerMetricKeys.map((v) => ({ kind: "metric", value: v }));
 
   const buildCombos = () => {
+    if (rowInnerDims.length === 0) {
+      return [{ grpFirst: true, grpLast: true }];
+    }
     if (bothInner) {
       const outerList = listFor(rowInnerDims[0]);
       const innerList = listFor(rowInnerDims[1]);
@@ -205,37 +256,30 @@ export function buildManualRows({
 
   const combos = buildCombos();
 
-  // Emit the inner (measure/metric) combo rows for one node, given the product
-  // + location context. `prodShow` marks the single row that carries the
-  // Product label/chevron; `locShow` (ci===0) carries the Location label.
-  const emitCombos = ({ prod, loc, prodShow }) => {
-    const cellsByMeasure = (loc || prod).cellsByMeasure || {};
+  // Emit the inner (measure/metric) combo rows for one full axis chain. Values
+  // come from the innermost node in the chain. On the first combo row, every
+  // not-yet-shown axis node claims its label (cell-merge / row spanning).
+  const emitCombos = (chain) => {
+    const innermost = chain[chain.length - 1];
+    const cellsByMeasure = innermost.cellsByMeasure || {};
     const alt = nodeCounter % 2 === 1;
     nodeCounter += 1;
     combos.forEach((combo, ci) => {
       const measure = combo.measure ?? orderedMeasures[0];
+      const axis = chain.map((node) => ({
+        label: node.value,
+        depth: node.depth,
+        hasChildren: node.hasChildren,
+        expanded: expandedKeys.has(node.fullKey),
+        pathKey: node.fullKey,
+        show: ci === 0 && !shown.has(node.fullKey),
+      }));
+      if (ci === 0) chain.forEach((node) => shown.add(node.fullKey));
       out.push({
-        id: `${prod.pathKey}${LOC_MARK}${loc ? loc.locPathKey : ""}${CELL_SEP}${
+        id: `${chain.map((n) => n.fullKey).join("|")}${CELL_SEP}${
           combo.measure ?? ""
         }${CELL_SEP}${combo.metricKey ?? ""}`,
-        // Product column context
-        __prodPathKey: prod.pathKey,
-        __prodDepth: prod.depth,
-        __prodLabel: prod.value,
-        __prodHasChildren: prod.children.length > 0,
-        __prodExpanded: expandedKeys.has(prod.pathKey),
-        __prodShow: prodShow && ci === 0,
-        // Location column context
-        __hasLocation: hasLocation,
-        __locPathKey: loc ? `${prod.pathKey}${LOC_MARK}${loc.locPathKey}` : "",
-        __locDepth: loc ? loc.depth : 0,
-        __locLabel: loc ? loc.value : "",
-        __locHasChildren: loc ? loc.children.length > 0 : false,
-        __locExpanded: loc
-          ? expandedKeys.has(`${prod.pathKey}${LOC_MARK}${loc.locPathKey}`)
-          : false,
-        __locShow: ci === 0,
-        // Inner measure/metric row context
+        __axis: axis,
         __isFirst: ci === 0,
         __isLast: ci === combos.length - 1,
         __grpFirst: combo.grpFirst,
@@ -249,27 +293,21 @@ export function buildManualRows({
     });
   };
 
-  const walkProduct = (nodes) => {
-    (nodes || []).forEach((prod) => {
-      if (prod.locTree) {
-        // The location "Total" root's first row also carries the Product label.
-        let firstOfProduct = true;
-        const walkLoc = (locNode) => {
-          emitCombos({ prod, loc: locNode, prodShow: firstOfProduct });
-          firstOfProduct = false;
-          const locKey = `${prod.pathKey}${LOC_MARK}${locNode.locPathKey}`;
-          if (expandedKeys.has(locKey)) locNode.children.forEach(walkLoc);
-        };
-        walkLoc(prod.locTree);
-      } else {
-        emitCombos({ prod, loc: null, prodShow: true });
-      }
-      if (expandedKeys.has(prod.pathKey) && prod.children.length > 0) {
-        walkProduct(prod.children);
-      }
-    });
+  // Walk one node: descend into its next axis (if any) to reach the innermost
+  // row, then — if the node is expanded — descend into its own same-axis
+  // children (which replace it in the same column at a deeper indent).
+  const walkNode = (node, ancestors) => {
+    const chain = [...ancestors, node];
+    if (node.childAxis) {
+      walkNode(node.childAxis, chain);
+    } else {
+      emitCombos(chain);
+    }
+    if (expandedKeys.has(node.fullKey) && node.children.length > 0) {
+      node.children.forEach((child) => walkNode(child, ancestors));
+    }
   };
 
-  walkProduct(productTree);
+  (productTree || []).forEach((prod) => walkNode(prod, []));
   return out;
 }

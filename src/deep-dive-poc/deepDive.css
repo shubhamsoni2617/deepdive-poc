@@ -910,10 +910,14 @@
   border-right: 1px solid #c3c8d4 !important;
 }
 
+/* Left-align the top group label so AG Grid keeps it sticky-visible: for a
+   very wide group (e.g. a measure spanning every week) a centered label sits
+   at the group's midpoint and only appears after scrolling. Left alignment
+   keeps it pinned to the visible left edge of the group at all times. */
 .dd-grid
   .ag-header-group-cell.pvt-header-group-top
   .ag-header-group-cell-label {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .dd-grid .ag-header-group-cell.pvt-header-group-top.pvt-header-group-a {

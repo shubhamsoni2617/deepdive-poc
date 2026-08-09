@@ -128,12 +128,11 @@ export function useDeepDivePivot() {
         .filter((g) => g.fields.length > 0),
     [arrangement, levels],
   );
-  const productFields = useMemo(
-    () => rowDimGroups[0]?.fields || [],
-    [rowDimGroups],
-  );
-  const locationFields = useMemo(
-    () => rowDimGroups.slice(1).flatMap((g) => g.fields),
+  // One field-list per real row dimension: the first is the drillable Product
+  // tree, each remaining one is an independent nested axis (own column + own
+  // expand state) — e.g. Location, then Time nested under every level.
+  const axisFieldGroups = useMemo(
+    () => rowDimGroups.map((g) => g.fields),
     [rowDimGroups],
   );
 
@@ -141,17 +140,10 @@ export function useDeepDivePivot() {
     if (!manualPivotActive) return null;
     return buildManualPivotModel({
       filteredRecords,
-      productFields,
-      locationFields,
+      axisFieldGroups,
       colLevelFields,
     });
-  }, [
-    manualPivotActive,
-    filteredRecords,
-    productFields,
-    locationFields,
-    colLevelFields,
-  ]);
+  }, [manualPivotActive, filteredRecords, axisFieldGroups, colLevelFields]);
 
   // Expand/collapse state for the manual pivot; reset when row dims change.
   const [expandedKeys, setExpandedKeys] = useState(() => new Set());
@@ -159,103 +151,55 @@ export function useDeepDivePivot() {
     setExpandedKeys(new Set());
   }, [rowLevelFields]);
 
-  // Accordion within each level, applied independently per axis: expanding a
-  // node collapses its siblings (and their descendants) on the SAME axis, while
-  // leaving the other axis untouched. Product keys have no LOC_MARK; Location
-  // keys are `<productPath>LOC_MARK<locPath>`.
+  // Expand/collapse for N independent row axes. A node's expand-key joins its
+  // ancestor axes with LOC_MARK and its own within-axis path with PATH_SEP, so:
+  //   axisIdx      = number of LOC_MARK separators
+  //   axisPrefix   = everything up to & including the last LOC_MARK
+  //   withinPath   = the node's path inside its own axis
+  // A descendant of `key` is any key that continues with PATH_SEP (deeper same
+  // axis) or LOC_MARK (a nested axis). Expanding runs a same-axis sibling
+  // accordion: siblings under the same parent (and their descendants) collapse.
   const toggleManualExpand = useCallback((key) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      const locIdx = key.indexOf(LOC_MARK);
+      const isDescendantOrSelf = (ek, k) =>
+        ek === k || ek.startsWith(k + PATH_SEP) || ek.startsWith(k + LOC_MARK);
 
       if (next.has(key)) {
-        // Collapsing: also clear expand-state of all descendants so they don't
-        // reappear expanded.
-        if (locIdx === -1) {
-          // Product node: deeper product keys + any location keys beneath it.
-          for (const ek of Array.from(next)) {
-            if (
-              ek === key ||
-              ek.startsWith(key + PATH_SEP) ||
-              ek.startsWith(key + LOC_MARK)
-            ) {
-              next.delete(ek);
-            }
-          }
-        } else {
-          // Location node: itself + deeper location nodes in the same product.
-          // (Total has empty locPath, so it clears the whole location subtree.)
-          const branchPrefix = key.slice(0, locIdx) + LOC_MARK;
-          const segs = key
-            .slice(locIdx + 1)
-            .split(PATH_SEP)
-            .filter(Boolean);
-          for (const ek of Array.from(next)) {
-            if (!ek.startsWith(branchPrefix)) continue;
-            const ekSegs = ek
-              .slice(branchPrefix.length)
-              .split(PATH_SEP)
-              .filter(Boolean);
-            if (ekSegs.length < segs.length) continue;
-            if (segs.every((s, i) => ekSegs[i] === s)) next.delete(ek);
-          }
+        // Collapse: drop the key and every descendant across nested axes.
+        for (const ek of Array.from(next)) {
+          if (isDescendantOrSelf(ek, key)) next.delete(ek);
         }
         return next;
       }
 
-      if (locIdx === -1) {
-        // Product axis: collapse product siblings, ignore location keys.
-        const sepIdx = key.lastIndexOf(PATH_SEP);
-        const parent = sepIdx === -1 ? "" : key.slice(0, sepIdx);
-        for (const ek of Array.from(next)) {
-          if (ek.indexOf(LOC_MARK) !== -1) continue;
-          const inBranch = parent === "" || ek.startsWith(parent + PATH_SEP);
-          if (!inBranch) continue;
-          const selfOrDesc = ek === key || ek.startsWith(key + PATH_SEP);
-          const isAnc = (key + PATH_SEP).startsWith(ek + PATH_SEP);
-          if (!selfOrDesc && !isAnc) next.delete(ek);
-        }
-        // Same row: expanding Product collapses this product's Location tree.
-        for (const ek of Array.from(next)) {
-          if (ek.startsWith(key + LOC_MARK)) next.delete(ek);
-        }
-      } else {
-        // Location axis: collapse only SAME-LEVEL sibling location nodes (and
-        // their descendants) within the SAME product node. Ancestors such as
-        // "Total" (fewer segments) are always kept.
-        const branchPrefix = key.slice(0, locIdx) + LOC_MARK;
-        const locPath = key.slice(locIdx + 1);
+      const countMarks = (s) => {
+        let n = 0;
+        for (let i = 0; i < s.length; i++) if (s[i] === LOC_MARK) n += 1;
+        return n;
+      };
+      const axisIdx = countMarks(key);
+      const lastLoc = key.lastIndexOf(LOC_MARK);
+      const axisPrefix = lastLoc === -1 ? "" : key.slice(0, lastLoc + 1);
+      const withinPath = lastLoc === -1 ? key : key.slice(lastLoc + 1);
+      const withinSegs = withinPath === "" ? [] : withinPath.split(PATH_SEP);
+      const parentSegs = withinSegs.slice(0, -1);
 
-        // Only ONE product node may have its Location tree expanded at a time:
-        // collapse every location key that belongs to a different product.
-        for (const ek of Array.from(next)) {
-          const ekLocIdx = ek.indexOf(LOC_MARK);
-          if (ekLocIdx === -1) continue;
-          if (!ek.startsWith(branchPrefix)) next.delete(ek);
-        }
-
-        // Same row: expanding Location collapses this product's Product tree.
-        const prod = key.slice(0, locIdx);
-        for (const ek of Array.from(next)) {
-          if (ek.indexOf(LOC_MARK) !== -1) continue;
-          if (ek === prod || ek.startsWith(prod + PATH_SEP)) next.delete(ek);
-        }
-
-        const segs = locPath === "" ? [] : locPath.split(PATH_SEP);
-        const level = segs.length; // Total=0, channel=1, store=2, …
-        if (level > 0) {
-          const parentPrefix = segs.slice(0, level - 1).join(PATH_SEP);
-          for (const ek of Array.from(next)) {
-            if (!ek.startsWith(branchPrefix)) continue;
-            const ekLoc = ek.slice(branchPrefix.length);
-            const ekSegs = ekLoc === "" ? [] : ekLoc.split(PATH_SEP);
-            if (ekSegs.length < level) continue; // ancestors: keep
-            const ekParent = ekSegs.slice(0, level - 1).join(PATH_SEP);
-            const ekAtLevel = ekSegs.slice(0, level).join(PATH_SEP);
-            // Same parent + same level, but a different node → sibling subtree.
-            if (ekParent === parentPrefix && ekAtLevel !== locPath) {
-              next.delete(ek);
-            }
+      // Same-axis sibling accordion under the same parent context.
+      for (const ek of Array.from(next)) {
+        if (countMarks(ek) !== axisIdx) continue;
+        const ekLastLoc = ek.lastIndexOf(LOC_MARK);
+        if ((ekLastLoc === -1 ? "" : ek.slice(0, ekLastLoc + 1)) !== axisPrefix)
+          continue;
+        const ekWithin = ekLastLoc === -1 ? ek : ek.slice(ekLastLoc + 1);
+        const ekSegs = ekWithin === "" ? [] : ekWithin.split(PATH_SEP);
+        if (ekSegs.length !== withinSegs.length) continue; // not same level
+        const sameParent =
+          ekSegs.length - 1 === parentSegs.length &&
+          parentSegs.every((s, i) => ekSegs[i] === s);
+        if (sameParent && ekWithin !== withinPath) {
+          for (const dk of Array.from(next)) {
+            if (isDescendantOrSelf(dk, ek)) next.delete(dk);
           }
         }
       }
