@@ -136,14 +136,34 @@ export function useDeepDivePivot() {
     [rowDimGroups],
   );
 
+  // One field-list per real COLUMN dimension (independent column axes). The
+  // first is the primary axis (drills directly, e.g. Time months->weeks); each
+  // remaining axis (e.g. Location) starts at its own "Total" and drills, and is
+  // shown across every column of the outer axes rather than nested-collapsed.
+  const colAxisGroups = useMemo(
+    () =>
+      arrangement.columns
+        .filter((d) => d !== "measures" && d !== "metrics")
+        .map((dim) => selectedLevelsFor(dim, levels))
+        .filter((fields) => fields.length > 0),
+    [arrangement, levels],
+  );
+
   const manualPivot = useMemo(() => {
     if (!manualPivotActive) return null;
     return buildManualPivotModel({
       filteredRecords,
       axisFieldGroups,
       colLevelFields,
+      colAxisGroups,
     });
-  }, [manualPivotActive, filteredRecords, axisFieldGroups, colLevelFields]);
+  }, [
+    manualPivotActive,
+    filteredRecords,
+    axisFieldGroups,
+    colLevelFields,
+    colAxisGroups,
+  ]);
 
   // Expand/collapse state for the manual pivot; reset when row dims change.
   const [expandedKeys, setExpandedKeys] = useState(() => new Set());
@@ -204,7 +224,63 @@ export function useDeepDivePivot() {
         }
       }
 
+      // Cross-axis mutual exclusion: at any node you may drill EITHER its own
+      // axis (same-axis children) OR its next nested axis — never both.
+      // (1) Expanding this node's own-axis children collapses any next-axis
+      //     drill hanging off it (keys continuing with LOC_MARK).
+      for (const ek of Array.from(next)) {
+        if (ek.startsWith(key + LOC_MARK)) next.delete(ek);
+      }
+      // (2) Expanding a next-axis node collapses its parent's own-axis children
+      //     drill (the parent node in the previous axis + its deeper same-axis).
+      if (lastLoc !== -1) {
+        const parentKey = key.slice(0, lastLoc);
+        for (const ek of Array.from(next)) {
+          if (ek === parentKey || ek.startsWith(parentKey + PATH_SEP)) {
+            next.delete(ek);
+          }
+        }
+      }
+
       next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Independent column-axis expand state, reset when column levels change. Keys
+  // are `${axisIdx}${LOC_MARK}${withinPath}` where withinPath joins the axis's
+  // drilled values with PATH_SEP. Expanding is global across the outer axes'
+  // columns (no per-cell state) and independent per axis (no cross-axis or
+  // sibling accordion): expanding Location shows channels under every period.
+  const [colExpandedKeys, setColExpandedKeys] = useState(() => new Set());
+  useEffect(() => {
+    setColExpandedKeys(new Set());
+  }, [colLevelFields]);
+
+  const toggleColExpand = useCallback((key) => {
+    setColExpandedKeys((prev) => {
+      const next = new Set(prev);
+      const idx = key.indexOf(LOC_MARK);
+      const axis = key.slice(0, idx);
+      const path = key.slice(idx + 1);
+      const segs = path === "" ? [] : path.split(PATH_SEP);
+      if (next.has(key)) {
+        // Collapse: drop this node and every deeper node on the SAME axis.
+        for (const ek of Array.from(next)) {
+          const eIdx = ek.indexOf(LOC_MARK);
+          if (ek.slice(0, eIdx) !== axis) continue;
+          const ePath = ek.slice(eIdx + 1);
+          const eSegs = ePath === "" ? [] : ePath.split(PATH_SEP);
+          if (
+            eSegs.length >= segs.length &&
+            segs.every((s, i) => eSegs[i] === s)
+          ) {
+            next.delete(ek);
+          }
+        }
+      } else {
+        next.add(key);
+      }
       return next;
     });
   }, []);
@@ -276,9 +352,12 @@ export function useDeepDivePivot() {
         visibleMetrics,
         manualPivot,
         colLevelFields,
+        colAxisGroups,
+        colExpandedKeys,
         onCellValueChanged: handleCellValueChanged,
         onGridReady: handleGridReady,
         onToggleManualExpand: toggleManualExpand,
+        onToggleColExpand: toggleColExpand,
       }),
     [
       arrangement,
@@ -287,9 +366,12 @@ export function useDeepDivePivot() {
       visibleMetrics,
       manualPivot,
       colLevelFields,
+      colAxisGroups,
+      colExpandedKeys,
       handleCellValueChanged,
       handleGridReady,
       toggleManualExpand,
+      toggleColExpand,
     ],
   );
 

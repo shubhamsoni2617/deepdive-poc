@@ -18,9 +18,12 @@ export function buildGridOptions({
   compact,
   manualPivot,
   colLevelFields,
+  colAxisGroups,
+  colExpandedKeys,
   onCellValueChanged,
   onGridReady,
   onToggleManualExpand,
+  onToggleColExpand,
 }) {
   const { manualPivotActive, measureOrMetricInCols, groupingColDims } =
     classifyArrangement(arrangement);
@@ -34,12 +37,14 @@ export function buildGridOptions({
         levels,
         manualPivot,
         colLevelFields,
+        colAxisGroups,
+        colExpandedKeys,
       }),
       pivotMode: false,
       rowHeight: 42,
       headerHeight: 42,
       groupHeaderHeight: 42,
-      context: { onToggleManualExpand },
+      context: { onToggleManualExpand, onToggleColExpand },
       getRowId: (p) => p.data.id,
       rowClassRules: {
         "dd-row-mid": (p) => p.data && !p.data.__isLast,

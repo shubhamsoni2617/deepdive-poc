@@ -15,8 +15,10 @@ import {
 } from "../config/dimensions";
 import { METRIC_REGISTRY, formatMetricValue } from "../config/metrics";
 import { metricsIsOutermost } from "../model/arrangement";
+import { LOC_MARK, PATH_SEP } from "../model/manualPivotModel";
+import ColGroupHeader from "../ColGroupHeader";
 import ProductTreeCell from "../ProductTreeCell";
-import { buildManualColumnKey } from "./columnKey";
+import { buildAxisColumnKey, buildManualColumnKey } from "./columnKey";
 import { formatColValue } from "./headerFormat";
 import {
   NUMERIC_CELL_CLASS,
@@ -44,6 +46,8 @@ export function buildManualColDefs({
   levels,
   manualPivot,
   colLevelFields,
+  colAxisGroups = [],
+  colExpandedKeys = new Set(),
 }) {
   const rowDims = arrangement.rows
     .filter((d) => d !== "measures" && d !== "metrics")
@@ -504,11 +508,11 @@ export function buildManualColDefs({
       headerClass: [NUMERIC_HEADER_CLASS, gCls],
     });
 
-    // Value-dim (Measure/Metric) steps only, in column-priority order. Used to
-    // build the rolled-up summary shown when a Time level is collapsed: the
-    // measure/metric breakdown is preserved but read at a coarser column key.
-    const valSteps = steps.filter((s) => s.type !== "field");
+    // Builds the rolled-up summary shown when a Time level is collapsed: the
+    // (inner) measure/metric breakdown is preserved but read at a coarser
+    // column key. `vsteps` are only the value dims nested inside that level.
     const buildValueStructure = (
+      vsteps,
       vIdx,
       ctx,
       comboKey,
@@ -517,8 +521,8 @@ export function buildManualColDefs({
       pathId,
       groupShow,
     ) => {
-      const vstep = valSteps[vIdx];
-      const isLast = vIdx === valSteps.length - 1;
+      const vstep = vsteps[vIdx];
+      const isLast = vIdx === vsteps.length - 1;
       const gs = vIdx === 0 ? { columnGroupShow: groupShow } : {};
       const entries =
         vstep.type === "measure"
@@ -551,6 +555,7 @@ export function buildManualColDefs({
         headerClass: [gCls],
         ...gs,
         children: buildValueStructure(
+          vsteps,
           vIdx + 1,
           e.ctx,
           comboKey,
@@ -682,19 +687,39 @@ export function buildManualColDefs({
         const deeperField = steps
           .slice(stepIdx + 1)
           .some((s) => s.type === "field");
-        if (step.type === "field" && deeperField && valSteps.length) {
+        // Value dims nested INSIDE this Time level (outer ones are already
+        // fixed in ctx and must NOT be re-expanded under the month).
+        const innerValSteps = steps
+          .slice(stepIdx + 1)
+          .filter((s) => s.type !== "field");
+        if (step.type === "field" && deeperField) {
           const prefixKey = buildManualColumnKey(
             (e.nextCombos[0]?.values || []).slice(0, e.nextFieldIdx),
           );
-          const summary = buildValueStructure(
-            0,
-            e.nextCtx,
-            prefixKey,
-            g,
-            c,
-            `${childPath}/sum`,
-            "closed",
-          );
+          const summary = innerValSteps.length
+            ? buildValueStructure(
+                innerValSteps,
+                0,
+                e.nextCtx,
+                prefixKey,
+                g,
+                c,
+                `${childPath}/sum`,
+                "closed",
+              )
+            : [
+                {
+                  ...leafColumn(
+                    e.nextCtx,
+                    { key: prefixKey },
+                    "",
+                    g,
+                    c,
+                    `${childPath}/sum`,
+                  ),
+                  columnGroupShow: "closed",
+                },
+              ];
           return {
             headerName: e.label,
             groupId: childPath,
@@ -728,8 +753,131 @@ export function buildManualColDefs({
     );
   };
 
+  // Independent column axes: 2+ real column dimensions (e.g. Time + Location),
+  // each an independent header band with its own Total + expand state, rather
+  // than one nested-collapsed chain. Value dims (measure/metric) remain the
+  // innermost leaves. Rebuilt from `colExpandedKeys` on every toggle.
+  const colRealDims = arrangement.columns.filter(
+    (d) => !isValueDimension(d) && selectedLevelsFor(d, levels).length > 0,
+  );
+  const buildIndependentAxisGroups = () => {
+    const combos = colCombos.length ? colCombos : [{ key: "", values: [] }];
+    const offsets = [];
+    let acc = 0;
+    colAxisGroups.forEach((f) => {
+      offsets.push(acc);
+      acc += f.length;
+    });
+
+    const buildValueTree = (offset, len) => {
+      const build = (subset, levelIdx, parentPath, parentVals) => {
+        if (levelIdx >= len) return [];
+        const order = [];
+        const map = new Map();
+        subset.forEach((cmb) => {
+          const v = cmb.values[offset + levelIdx];
+          if (!map.has(v)) {
+            map.set(v, []);
+            order.push(v);
+          }
+          map.get(v).push(cmb);
+        });
+        order.sort((a, b) =>
+          String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0,
+        );
+        return order.map((v) => {
+          const path = parentPath ? `${parentPath}${PATH_SEP}${v}` : String(v);
+          const vals = [...parentVals, v];
+          return {
+            value: v,
+            path,
+            vals,
+            depth: levelIdx,
+            children: build(map.get(v), levelIdx + 1, path, vals),
+          };
+        });
+      };
+      return build(combos, 0, "", []);
+    };
+
+    const axisTrees = colAxisGroups.map((f, a) =>
+      buildValueTree(offsets[a], f.length),
+    );
+
+    const leaf = (coord, gCls, cCls) =>
+      buildMetricChildren({ key: buildAxisColumnKey(coord) }, cCls, gCls);
+
+    const renderNodes = (a, nodes, coord, gCls, cCls, banded) =>
+      nodes.map((node, idx) => {
+        let g = gCls;
+        let c = cCls;
+        let headerClass = [gCls];
+        if (banded) {
+          const band = shadeByIndex(idx);
+          g = band.header;
+          c = band.cell;
+          headerClass = [g, "pvt-header-group-top"];
+        }
+        const expKey = `${a}${LOC_MARK}${node.path}`;
+        const expandable = node.children.length > 0;
+        const expanded = expandable && colExpandedKeys.has(expKey);
+        const children = expanded
+          ? renderNodes(a, node.children, coord, g, c, false)
+          : renderAxis(a + 1, [...coord, node.vals], g, c);
+        return {
+          groupId: `colax_${a}_${node.path}_${buildAxisColumnKey(coord)}`,
+          headerName: String(node.value),
+          headerGroupComponent: ColGroupHeader,
+          headerGroupComponentParams: {
+            label: formatColValue(colAxisGroups[a][node.depth], node.value),
+            expandable,
+            expanded,
+            toggleKey: expKey,
+          },
+          headerClass,
+          children,
+        };
+      });
+
+    const renderAxis = (a, coord, gCls, cCls) => {
+      if (a >= colAxisGroups.length) return leaf(coord, gCls, cCls);
+      const nodes = axisTrees[a];
+      if (a === 0) {
+        // Primary axis: values shown directly (no Total root), banded per group.
+        return renderNodes(a, nodes, coord, gCls, cCls, true);
+      }
+      // Secondary axis: one "<Dim> Total" root that expands to its values.
+      const dimLabel = DIMENSION_LABELS[colRealDims[a]] || colRealDims[a];
+      const totalKey = `${a}${LOC_MARK}`;
+      const expandable = nodes.length > 0;
+      const expanded = expandable && colExpandedKeys.has(totalKey);
+      const children = expanded
+        ? renderNodes(a, nodes, coord, gCls, cCls, false)
+        : renderAxis(a + 1, [...coord, []], gCls, cCls);
+      return [
+        {
+          groupId: `colax_${a}_total_${buildAxisColumnKey(coord)}`,
+          headerName: `${dimLabel} Total`,
+          headerGroupComponent: ColGroupHeader,
+          headerGroupComponentParams: {
+            label: `${dimLabel} Total`,
+            expandable,
+            expanded,
+            toggleKey: totalKey,
+          },
+          headerClass: [gCls],
+          children,
+        },
+      ];
+    };
+
+    return renderAxis(0, [], "pvt-header-group-a", "pvt-col-group-a");
+  };
+
   let valueGroups;
-  if (valueDimsInCols) {
+  if (colAxisGroups.length >= 2 && !valueDimsInCols) {
+    valueGroups = buildIndependentAxisGroups();
+  } else if (valueDimsInCols) {
     valueGroups = buildValueDimGroups();
   } else if (colLevelFields.length === 0) {
     const combo = colCombos[0] || { key: "", values: [] };

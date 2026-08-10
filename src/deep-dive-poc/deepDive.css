@@ -1044,6 +1044,28 @@
 .dd-grid .dd-tree-chevron--empty {
   cursor: default;
 }
+/* Independent column-axis group header (custom headerGroupComponent). */
+.dd-grid .dd-colh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.dd-grid .dd-colh-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 16px;
+  color: #7a8294;
+  cursor: pointer;
+  user-select: none;
+}
+.dd-grid .dd-colh-label {
+  font-weight: 400;
+  color: #1f2b4d;
+}
 .dd-grid .dd-tree-label {
   font-weight: 400;
   color: #1f2b4d;

@@ -306,6 +306,8 @@ export default function DeepDiveApp() {
                         String(compact)
                       }
                       gridOptions={gridOptions}
+                      columnDefs={gridOptions.columnDefs}
+                      context={gridOptions.context}
                       rowData={records}
                       rowClassRules={{
                         "dd-row-mid": (p) =>

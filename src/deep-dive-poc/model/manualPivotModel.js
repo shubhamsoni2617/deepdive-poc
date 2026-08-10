@@ -8,7 +8,7 @@
  *   buildManualRows       — flatten the tree into visible grid rows
  */
 
-import { buildManualColumnKey } from "../columns/columnKey";
+import { buildAxisColumnKey, buildManualColumnKey } from "../columns/columnKey";
 import { addRecordComponents, emptyComponents } from "../config/metrics";
 
 // Path-segment separators (control chars, safe vs data values). LOC_MARK
@@ -19,25 +19,54 @@ export const LOC_MARK = "\u0003";
 
 export const cellKey = (pathKey, measure) => `${pathKey}${CELL_SEP}${measure}`;
 
-/** Column prefix keys for a record (every prefix so collapsed groups roll up). */
-function colKeysForRecord(r, colLevelFields) {
+/** Cartesian product of per-axis prefix arrays: [[[], [v0], ...], ...]. */
+function crossProduct(perAxisPrefixLists) {
+  return perAxisPrefixLists.reduce(
+    (acc, prefixes) => {
+      const out = [];
+      acc.forEach((chosen) => {
+        prefixes.forEach((p) => out.push([...chosen, p]));
+      });
+      return out;
+    },
+    [[]],
+  );
+}
+
+/**
+ * Column keys for a record. Always emits the flat cumulative prefixes (used by
+ * the single-dimension column paths). When there are >= 2 real column axes
+ * (independent-axis mode), also emits the cross product of each axis's own
+ * prefixes so any axis can be drilled while the others sit at Total — e.g. a
+ * key for (Time=month total, Location=channel) that no flat prefix provides.
+ */
+function colKeysForRecord(r, colLevelFields, colAxisGroups) {
   const colValues = colLevelFields.map((f) => r[f]);
-  if (colLevelFields.length === 0) return [buildManualColumnKey(colValues)];
-  // Always include the empty (all-time) prefix so a collapsed outer value-dim
-  // group (e.g. a collapsible Measure) can roll up across every column period.
-  const keys = [buildManualColumnKey([])];
+  const keys = new Set();
+  keys.add(buildManualColumnKey([]));
   for (let n = 1; n <= colLevelFields.length; n++) {
-    keys.push(buildManualColumnKey(colValues.slice(0, n)));
+    keys.add(buildManualColumnKey(colValues.slice(0, n)));
+  }
+  if (colAxisGroups && colAxisGroups.length >= 2) {
+    const perAxisPrefixLists = colAxisGroups.map((fields) => {
+      const vals = fields.map((f) => r[f]);
+      const prefixes = [];
+      for (let n = 0; n <= vals.length; n++) prefixes.push(vals.slice(0, n));
+      return prefixes;
+    });
+    crossProduct(perAxisPrefixLists).forEach((axisArrays) =>
+      keys.add(buildAxisColumnKey(axisArrays)),
+    );
   }
   return keys;
 }
 
 /** Aggregate a record list into { measure -> { colKey: components } }. */
-function aggregateByMeasure(records, colLevelFields) {
+function aggregateByMeasure(records, colLevelFields, colAxisGroups) {
   const byMeasure = {};
   records.forEach((r) => {
     const cbm = byMeasure[r.measure] || (byMeasure[r.measure] = {});
-    colKeysForRecord(r, colLevelFields).forEach((ck) => {
+    colKeysForRecord(r, colLevelFields, colAxisGroups).forEach((ck) => {
       cbm[ck] = addRecordComponents(cbm[ck] || emptyComponents(), r);
     });
   });
@@ -80,6 +109,7 @@ function buildAxisTree(
   groupIdx,
   colLevelFields,
   ancestorKey,
+  colAxisGroups,
 ) {
   const fields = secondaryGroups[groupIdx];
   const axisIdx = groupIdx + 1; // axis 0 is the Product tree
@@ -92,7 +122,7 @@ function buildAxisTree(
       fullKey,
       depth,
       value,
-      cellsByMeasure: aggregateByMeasure(recs, colLevelFields),
+      cellsByMeasure: aggregateByMeasure(recs, colLevelFields, colAxisGroups),
       children,
       // Chevron in this column reflects only same-axis children; the next axis
       // renders in its own column with its own always-visible Total.
@@ -104,6 +134,7 @@ function buildAxisTree(
             groupIdx + 1,
             colLevelFields,
             fullKey,
+            colAxisGroups,
           )
         : null,
     };
@@ -139,6 +170,7 @@ export function buildManualPivotModel({
   filteredRecords,
   axisFieldGroups = [],
   colLevelFields,
+  colAxisGroups = [],
 }) {
   const productFields = axisFieldGroups[0] || [];
   const secondaryGroups = axisFieldGroups.slice(1);
@@ -178,19 +210,44 @@ export function buildManualPivotModel({
         fullKey: pk,
         depth: levelIdx,
         value,
-        cellsByMeasure: aggregateByMeasure(sub, colLevelFields),
+        cellsByMeasure: aggregateByMeasure(sub, colLevelFields, colAxisGroups),
         children,
         hasChildren: children.length > 0,
         childAxis: hasLocation
-          ? buildAxisTree(sub, secondaryGroups, 0, colLevelFields, pk)
+          ? buildAxisTree(
+              sub,
+              secondaryGroups,
+              0,
+              colLevelFields,
+              pk,
+              colAxisGroups,
+            )
           : null,
       };
     });
   };
 
+  // With no real row dimension (e.g. only Metrics in rows), there is no tree to
+  // walk — emit a single synthetic root aggregating all records so the inner
+  // measure/metric rows still render with their column values.
   const productTree = productFields.length
     ? buildProduct(filteredRecords, 0, "")
-    : [];
+    : [
+        {
+          axisIdx: 0,
+          fullKey: "",
+          depth: 0,
+          value: null,
+          cellsByMeasure: aggregateByMeasure(
+            filteredRecords,
+            colLevelFields,
+            colAxisGroups,
+          ),
+          children: [],
+          hasChildren: false,
+          childAxis: null,
+        },
+      ];
 
   return {
     colCombos,
