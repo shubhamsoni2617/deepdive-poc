@@ -156,10 +156,14 @@ export function buildManualColDefs({
   });
   // A column level should get a "Total" rollup group when it is the entry into
   // a real non-Time dimension (Location/Product), mirroring the rows behavior.
+  // Exception: a real dimension at the FIRST column level (level 0) is never
+  // collapsible — its values render directly. Only deeper levels get the
+  // collapsible "Total" wrapper.
   const isTotaledDimEntry = (level) =>
+    level !== 0 &&
     colFieldDims[level] &&
     colFieldDims[level] !== DIMENSIONS.TIME &&
-    (level === 0 || colFieldDims[level - 1] !== colFieldDims[level]);
+    colFieldDims[level - 1] !== colFieldDims[level];
 
   // Leaf value columns for one column combo, depending on which value dimension
   // is innermost.
@@ -645,41 +649,9 @@ export function buildManualColDefs({
           childPath,
         );
 
-        // Collapsible outermost Measure group: when collapsed, roll up to one
-        // all-time total column per metric; when open, show the full detail.
-        // Only meaningful if a Time level is nested inside — otherwise the
-        // metric leaves already ARE the totals and collapsing is a no-op.
-        const hasNestedField = steps
-          .slice(stepIdx + 1)
-          .some((s) => s.type === "field");
-        if (stepIdx === 0 && step.type === "measure" && hasNestedField) {
-          const summary = selectedMetrics.map((mk) => ({
-            colId: `v__${childPath}/sum_${mk}`,
-            headerName: metricLabel(mk),
-            columnGroupShow: "closed",
-            valueGetter: (p) => {
-              if (!p.data) return null;
-              const bm = p.data.__cellsByMeasure?.[e.nextCtx.measure];
-              return bm ? bm[""] || null : null;
-            },
-            valueFormatter: (p) =>
-              p.value ? formatMetricValue(mk, p.value) : "",
-            cellDataType: false,
-            width: 100,
-            cellClass: [NUMERIC_CELL_CLASS, c],
-            headerClass: [NUMERIC_HEADER_CLASS, g],
-          }));
-          return {
-            headerName: e.label,
-            groupId: childPath,
-            headerClass,
-            openByDefault: false,
-            children: [
-              ...summary,
-              ...detail.map((d) => ({ ...d, columnGroupShow: "open" })),
-            ],
-          };
-        }
+        // Measure/Metric are never collapsible when in columns: the outermost
+        // value-dim group always renders its full detail (any collapsibility
+        // comes solely from nested Time levels below).
 
         // Collapsible Time level: when a deeper Time level exists, collapsing
         // this one rolls up the finer periods while preserving the
@@ -819,8 +791,17 @@ export function buildManualColDefs({
           headerClass = [g, "pvt-header-group-top"];
         }
         const expKey = `${a}${LOC_MARK}${node.path}`;
-        const expandable = node.children.length > 0;
-        const expanded = expandable && colExpandedKeys.has(expKey);
+        // A real NON-Time dimension (Product/Location) at the FIRST column level
+        // (primary axis, depth 0) is never collapsible: it always renders its
+        // full detail, no toggle. Time is exempt — a first-level Time dimension
+        // with more than one aggregation (e.g. week + month) stays collapsible.
+        const isFirstLevel =
+          a === 0 && node.depth === 0 && colRealDims[a] !== DIMENSIONS.TIME;
+        const hasChildren = node.children.length > 0;
+        const expandable = hasChildren && !isFirstLevel;
+        const expanded =
+          (isFirstLevel && hasChildren) ||
+          (expandable && colExpandedKeys.has(expKey));
         const children = expanded
           ? renderNodes(a, node.children, coord, g, c, false)
           : renderAxis(a + 1, [...coord, node.vals], g, c);
