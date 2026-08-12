@@ -6,6 +6,7 @@ import {
   emptyComponents,
   addRecordComponents,
 } from "./config/metrics";
+import { runPivotQuery } from "./db/pivotQuery";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -360,4 +361,18 @@ export async function fetchDeepDiveEdits(payload = {}) {
     version: Date.now(),
     updatedCount: payload?.edits?.length ?? 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Granular-DB pivot API (see src/deep-dive-poc/db/*).
+//
+// This is the "real" contract endpoint: it aggregates the base-grain fact table
+// (26 weeks × SKU × Store × Measure) on demand from the pivot selection payload
+// and returns the agreed row/column response shape.
+// ---------------------------------------------------------------------------
+
+/** Mock of `POST /api/deep-dive/pivot` — selection-driven aggregation. */
+export async function fetchPivotTable(payload = {}) {
+  await delay(250);
+  return runPivotQuery(payload);
 }

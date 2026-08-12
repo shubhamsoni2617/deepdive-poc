@@ -26,3 +26,17 @@ export function shadeByValue(value) {
 export function shadeByIndex(index) {
   return index % 2 === 1 ? GROUP_B : GROUP_A;
 }
+
+/**
+ * Banding for a TOP-LEVEL column group: the shading classes plus the
+ * `pvt-header-group-top` marker every outermost header carries. Returns the
+ * header class (`g`), cell class (`c`) and the assembled `headerClass` array.
+ */
+export function topBand(index) {
+  const band = shadeByIndex(index);
+  return {
+    g: band.header,
+    c: band.cell,
+    headerClass: [band.header, "pvt-header-group-top"],
+  };
+}

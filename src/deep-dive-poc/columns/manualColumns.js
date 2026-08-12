@@ -13,18 +13,22 @@ import {
   isValueDimension,
   selectedLevelsFor,
 } from "../config/dimensions";
-import { METRIC_REGISTRY, formatMetricValue } from "../config/metrics";
-import { metricsIsOutermost } from "../model/arrangement";
+import { METRIC_REGISTRY } from "../config/metrics";
+import { classifyArrangement, metricsIsOutermost } from "../model/arrangement";
 import { LOC_MARK, PATH_SEP } from "../model/manualPivotModel";
 import ColGroupHeader from "../ColGroupHeader";
 import ProductTreeCell from "../ProductTreeCell";
 import { buildAxisColumnKey, buildManualColumnKey } from "./columnKey";
 import { formatColValue } from "./headerFormat";
+import { collapsibleGroup, groupByOrdered } from "./grouping";
+import { topBand } from "./shading";
 import {
-  NUMERIC_CELL_CLASS,
-  NUMERIC_HEADER_CLASS,
-  shadeByIndex,
-} from "./shading";
+  makeValueCol,
+  readByMeasure,
+  readByRowMeasure,
+  readCells,
+  toClassArray,
+} from "./valueColumn";
 
 const metricLabel = (key) => METRIC_REGISTRY[key]?.label || key;
 
@@ -33,12 +37,10 @@ const metricLabel = (key) => METRIC_REGISTRY[key]?.label || key;
 // empty sub-column.
 const markIfBlank = (col) => {
   if (col.headerName !== "") return col;
-  const hc = Array.isArray(col.headerClass)
-    ? col.headerClass
-    : col.headerClass
-      ? [col.headerClass]
-      : [];
-  return { ...col, headerClass: [...hc, "dd-h-blank"] };
+  return {
+    ...col,
+    headerClass: [...toClassArray(col.headerClass), "dd-h-blank"],
+  };
 };
 
 export function buildManualColDefs({
@@ -54,13 +56,12 @@ export function buildManualColDefs({
     .filter((d) => selectedLevelsFor(d, levels).length > 0);
   const hasRowDims = rowDims.length > 0;
 
-  const measuresInRows = arrangement.rows.includes("measures");
-  const metricsInRows = arrangement.rows.includes("metrics");
-  const innerIsMetric = metricsInRows && !measuresInRows;
-  const bothInner = measuresInRows && metricsInRows;
-  // Neither value dim in rows → both are column dimensions; there is no inner
-  // Measure/Metric pinned column and each node renders as a single row.
-  const valueDimsInCols = !measuresInRows && !metricsInRows;
+  // Arrangement classification (how measures/metrics are placed) is owned by
+  // the model layer — consume it here instead of recomputing the same flags.
+  // valueDimsInCols: neither value dim in rows → both are column dimensions,
+  // so there is no inner Measure/Metric pinned column.
+  const { measuresInRows, innerIsMetric, bothInner, valueDimsInCols } =
+    classifyArrangement(arrangement);
   const innerDimOrder = arrangement.rows.filter(
     (d) => d === "measures" || d === "metrics",
   );
@@ -168,63 +169,41 @@ export function buildManualColDefs({
   // Leaf value columns for one column combo, depending on which value dimension
   // is innermost.
   const buildMetricChildren = (combo, cellGrpClass, grpClass, groupShow) => {
-    const withGroupShow = (col) => {
-      if (groupShow) col.columnGroupShow = groupShow;
-      return col;
-    };
+    const suffix = groupShow ? `__${groupShow}` : "";
+    const common = { gCls: grpClass, cCls: cellGrpClass, groupShow };
 
+    // Both value dims inner: one column reading the row's measure + metricKey.
     if (bothInner) {
       return [
-        withGroupShow({
-          colId: `${combo.key}__val${groupShow ? `__${groupShow}` : ""}`,
+        makeValueCol({
+          ...common,
+          colId: `${combo.key}__val${suffix}`,
           headerName: colLevelFields.length === 0 ? "Value" : "",
-          valueGetter: (p) => {
-            if (!p.data) return null;
-            const byMeasure = p.data.__cellsByMeasure?.[p.data.measure];
-            return byMeasure ? byMeasure[combo.key] || null : null;
-          },
-          valueFormatter: (p) =>
-            p.value ? formatMetricValue(p.data?.metricKey, p.value) : "",
-          cellDataType: false,
-          width: 100,
-          cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
-          headerClass: [NUMERIC_HEADER_CLASS, grpClass],
+          read: readByRowMeasure(combo.key),
         }),
       ];
     }
 
+    // Metrics inner (rows): one column per measure, formatted by row metricKey.
     if (innerIsMetric) {
       return measureCols.map((mc) =>
-        withGroupShow({
-          colId: `${combo.key}__meas_${mc.dataValue}${
-            groupShow ? `__${groupShow}` : ""
-          }`,
+        makeValueCol({
+          ...common,
+          colId: `${combo.key}__meas_${mc.dataValue}${suffix}`,
           headerName: mc.label,
-          valueGetter: (p) => {
-            if (!p.data) return null;
-            const byMeasure = p.data.__cellsByMeasure?.[mc.dataValue];
-            return byMeasure ? byMeasure[combo.key] || null : null;
-          },
-          valueFormatter: (p) =>
-            p.value ? formatMetricValue(p.data?.metricKey, p.value) : "",
-          cellDataType: false,
-          width: 100,
-          cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
-          headerClass: [NUMERIC_HEADER_CLASS, grpClass],
+          read: readByMeasure(mc.dataValue, combo.key),
         }),
       );
     }
 
+    // Default: one column per selected metric, formatted by that fixed metric.
     return selectedMetrics.map((mk) =>
-      withGroupShow({
-        colId: `${combo.key}__${mk}${groupShow ? `__${groupShow}` : ""}`,
+      makeValueCol({
+        ...common,
+        colId: `${combo.key}__${mk}${suffix}`,
         headerName: metricLabel(mk),
-        valueGetter: (p) => (p.data ? p.data.__cells[combo.key] || null : null),
-        valueFormatter: (p) => (p.value ? formatMetricValue(mk, p.value) : ""),
-        cellDataType: false,
-        width: 100,
-        cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
-        headerClass: [NUMERIC_HEADER_CLASS, grpClass],
+        read: readCells(combo.key),
+        metricKey: mk,
       }),
     );
   };
@@ -236,20 +215,15 @@ export function buildManualColDefs({
     cellGrpClass,
     grpClass,
     groupShow,
-  ) => {
-    const col = {
+  ) =>
+    makeValueCol({
       colId: `${combo.key}__${mk}${groupShow ? `__${groupShow}` : ""}`,
-      headerName: "",
-      valueGetter: (p) => (p.data ? p.data.__cells[combo.key] || null : null),
-      valueFormatter: (p) => (p.value ? formatMetricValue(mk, p.value) : ""),
-      cellDataType: false,
-      width: 100,
-      cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
-      headerClass: [NUMERIC_HEADER_CLASS, grpClass],
-    };
-    if (groupShow) col.columnGroupShow = groupShow;
-    return col;
-  };
+      gCls: grpClass,
+      cCls: cellGrpClass,
+      groupShow,
+      read: readCells(combo.key),
+      metricKey: mk,
+    });
 
   // A single leaf for a fixed measure (used when measure is the outer group and
   // metrics is a row dim, so each row formats against its own metricKey).
@@ -259,27 +233,16 @@ export function buildManualColDefs({
     cellGrpClass,
     grpClass,
     groupShow,
-  ) => {
-    const col = {
+  ) =>
+    makeValueCol({
       colId: `${combo.key}__meas_${mc.dataValue}${
         groupShow ? `__${groupShow}` : ""
       }`,
-      headerName: "",
-      valueGetter: (p) => {
-        if (!p.data) return null;
-        const bm = p.data.__cellsByMeasure?.[mc.dataValue];
-        return bm ? bm[combo.key] || null : null;
-      },
-      valueFormatter: (p) =>
-        p.value ? formatMetricValue(p.data?.metricKey, p.value) : "",
-      cellDataType: false,
-      width: 100,
-      cellClass: [NUMERIC_CELL_CLASS, cellGrpClass],
-      headerClass: [NUMERIC_HEADER_CLASS, grpClass],
-    };
-    if (groupShow) col.columnGroupShow = groupShow;
-    return col;
-  };
+      gCls: grpClass,
+      cCls: cellGrpClass,
+      groupShow,
+      read: readByMeasure(mc.dataValue, combo.key),
+    });
 
   // Recursively nest column-dimension levels; leaves come from leafBuilder.
   // A real non-Time dimension (Location) is wrapped in a collapsible "Total"
@@ -297,10 +260,10 @@ export function buildManualColDefs({
       let cClass = cellGrpClass;
       let headerClass = [grpClass];
       if (level === 0 && shadeLevel0) {
-        const band = shadeByIndex(0);
-        gClass = band.header;
-        cClass = band.cell;
-        headerClass = [gClass, "pvt-header-group-top"];
+        const band = topBand(0);
+        gClass = band.g;
+        cClass = band.c;
+        headerClass = band.headerClass;
       }
       const prefixKey = buildManualColumnKey(
         (combos[0]?.values || []).slice(0, level),
@@ -315,25 +278,21 @@ export function buildManualColDefs({
       );
       // Single value: no Total rollup/toggle — show the one column expanded.
       if (rawPerValue.length === 1) return rawPerValue;
-      const summaryChildren = leafBuilder(
+      const summary = leafBuilder(
         { key: prefixKey },
         cClass,
         gClass,
         "closed",
       ).map(markIfBlank);
-      const perValue = rawPerValue.map((g) => ({
-        ...g,
-        columnGroupShow: "open",
-      }));
       return [
-        {
+        collapsibleGroup({
           headerName:
             `${DIMENSION_LABELS[colFieldDims[level]] || ""} Total`.trim(),
           groupId: `total__${colFieldDims[level]}__${prefixKey}`,
           headerClass,
-          openByDefault: false,
-          children: [...summaryChildren, ...perValue],
-        },
+          summary,
+          detail: rawPerValue,
+        }),
       ];
     }
     return buildLevelGroups(
@@ -355,16 +314,10 @@ export function buildManualColDefs({
     leafBuilder = buildMetricChildren,
     shadeLevel0 = true,
   ) => {
-    const order = [];
-    const byValue = new Map();
-    combos.forEach((combo) => {
-      const v = combo.values[level];
-      if (!byValue.has(v)) {
-        byValue.set(v, []);
-        order.push(v);
-      }
-      byValue.get(v).push(combo);
-    });
+    const { order, map: byValue } = groupByOrdered(
+      combos,
+      (combo) => combo.values[level],
+    );
 
     const isLast = level === colLevelFields.length - 1;
 
@@ -374,19 +327,16 @@ export function buildManualColDefs({
 
       let gClass = grpClass;
       let cClass = cellGrpClass;
+      let headerClass = [grpClass];
       if (level === 0 && shadeLevel0) {
         // Positional alternation (not value-hash) so adjacent top-level groups
         // strictly alternate their accent underline, like ux-cypher's
         // nth-child(even/odd) group headers.
-        const band = shadeByIndex(orderIdx);
-        gClass = band.header;
-        cClass = band.cell;
+        const band = topBand(orderIdx);
+        gClass = band.g;
+        cClass = band.c;
+        headerClass = band.headerClass;
       }
-
-      const headerClass =
-        level === 0 && shadeLevel0
-          ? [gClass, "pvt-header-group-top"]
-          : [gClass];
 
       if (isLast) {
         const leafChildren = leafBuilder(childCombos[0], cClass, gClass);
@@ -394,15 +344,10 @@ export function buildManualColDefs({
         // leaf itself (avoids a redundant empty header row).
         if (leafChildren.length === 1 && !leafChildren[0].headerName) {
           const leaf = leafChildren[0];
-          const leafHeaderClass = Array.isArray(leaf.headerClass)
-            ? leaf.headerClass
-            : leaf.headerClass
-              ? [leaf.headerClass]
-              : [];
           return {
             ...leaf,
             headerName,
-            headerClass: [...leafHeaderClass, ...headerClass],
+            headerClass: [...toClassArray(leaf.headerClass), ...headerClass],
           };
         }
         return {
@@ -433,24 +378,20 @@ export function buildManualColDefs({
       const prefixKey = buildManualColumnKey(
         childCombos[0].values.slice(0, level + 1),
       );
-      const summaryChildren = leafBuilder(
+      const summary = leafBuilder(
         { key: prefixKey },
         cClass,
         gClass,
         "closed",
       ).map(markIfBlank);
-      const nested = rawNested.map((g) => ({
-        ...g,
-        columnGroupShow: "open",
-      }));
 
-      return {
+      return collapsibleGroup({
         headerName,
         groupId: `grp__${level}__${v}`,
         headerClass,
-        openByDefault: false,
-        children: [...summaryChildren, ...nested],
-      };
+        summary,
+        detail: rawNested,
+      });
     });
   };
 
@@ -496,21 +437,15 @@ export function buildManualColDefs({
     if (steps.length === 0) return [];
     const lastIdx = steps.length - 1;
 
-    const leafColumn = (ctx, combo, headerName, gCls, cCls, pathId) => ({
-      colId: `v__${pathId}`,
-      headerName,
-      valueGetter: (p) => {
-        if (!p.data) return null;
-        const bm = p.data.__cellsByMeasure?.[ctx.measure];
-        return bm ? bm[combo.key] || null : null;
-      },
-      valueFormatter: (p) =>
-        p.value ? formatMetricValue(ctx.metric, p.value) : "",
-      cellDataType: false,
-      width: 100,
-      cellClass: [NUMERIC_CELL_CLASS, cCls],
-      headerClass: [NUMERIC_HEADER_CLASS, gCls],
-    });
+    const leafColumn = (ctx, combo, headerName, gCls, cCls, pathId) =>
+      makeValueCol({
+        colId: `v__${pathId}`,
+        headerName,
+        gCls,
+        cCls,
+        read: readByMeasure(ctx.measure, combo.key),
+        metricKey: ctx.metric,
+      });
 
     // Builds the rolled-up summary shown when a Time level is collapsed: the
     // (inner) measure/metric breakdown is preserved but read at a coarser
@@ -591,16 +526,10 @@ export function buildManualColDefs({
           idKey: `k_${mk}`,
         }));
       }
-      const order = [];
-      const seen = new Map();
-      combos.forEach((c) => {
-        const v = c.values[fieldIdx];
-        if (!seen.has(v)) {
-          seen.set(v, []);
-          order.push(v);
-        }
-        seen.get(v).push(c);
-      });
+      const { order, map: seen } = groupByOrdered(
+        combos,
+        (c) => c.values[fieldIdx],
+      );
       return order.map((v) => ({
         label: formatColValue(step.field, v),
         nextCtx: ctx,
@@ -633,10 +562,10 @@ export function buildManualColDefs({
         let c = cCls;
         let headerClass = [g];
         if (stepIdx === 0) {
-          const band = shadeByIndex(idx);
-          g = band.header;
-          c = band.cell;
-          headerClass = [g, "pvt-header-group-top"];
+          const band = topBand(idx);
+          g = band.g;
+          c = band.c;
+          headerClass = band.headerClass;
         }
         const childPath = `${pathId}/${e.idKey}`;
         const detail = recurse(
@@ -692,16 +621,13 @@ export function buildManualColDefs({
                   columnGroupShow: "closed",
                 },
               ];
-          return {
+          return collapsibleGroup({
             headerName: e.label,
             groupId: childPath,
             headerClass,
-            openByDefault: false,
-            children: [
-              ...summary,
-              ...detail.map((d) => ({ ...d, columnGroupShow: "open" })),
-            ],
-          };
+            summary,
+            detail,
+          });
         }
 
         return {
@@ -744,16 +670,10 @@ export function buildManualColDefs({
     const buildValueTree = (offset, len) => {
       const build = (subset, levelIdx, parentPath, parentVals) => {
         if (levelIdx >= len) return [];
-        const order = [];
-        const map = new Map();
-        subset.forEach((cmb) => {
-          const v = cmb.values[offset + levelIdx];
-          if (!map.has(v)) {
-            map.set(v, []);
-            order.push(v);
-          }
-          map.get(v).push(cmb);
-        });
+        const { order, map } = groupByOrdered(
+          subset,
+          (cmb) => cmb.values[offset + levelIdx],
+        );
         order.sort((a, b) =>
           String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0,
         );
@@ -785,10 +705,10 @@ export function buildManualColDefs({
         let c = cCls;
         let headerClass = [gCls];
         if (banded) {
-          const band = shadeByIndex(idx);
-          g = band.header;
-          c = band.cell;
-          headerClass = [g, "pvt-header-group-top"];
+          const band = topBand(idx);
+          g = band.g;
+          c = band.c;
+          headerClass = band.headerClass;
         }
         const expKey = `${a}${LOC_MARK}${node.path}`;
         // A real NON-Time dimension (Product/Location) at the FIRST column level
@@ -869,19 +789,19 @@ export function buildManualColDefs({
     );
   } else if (metricsOuter) {
     valueGroups = selectedMetrics.map((mk, i) => {
-      const band = shadeByIndex(i);
+      const band = topBand(i);
       const leafBuilder = (combo, cGrp, gGrp, groupShow) => [
         buildSingleMetricLeaf(mk, combo, cGrp, gGrp, groupShow),
       ];
       return {
         headerName: metricLabel(mk),
         groupId: `metric__${mk}`,
-        headerClass: [band.header, "pvt-header-group-top"],
+        headerClass: band.headerClass,
         children: buildColGroups(
           colCombos,
           0,
-          band.header,
-          band.cell,
+          band.g,
+          band.c,
           leafBuilder,
           false,
         ),
@@ -889,19 +809,19 @@ export function buildManualColDefs({
     });
   } else if (measuresOuter) {
     valueGroups = measureCols.map((mc, i) => {
-      const band = shadeByIndex(i);
+      const band = topBand(i);
       const leafBuilder = (combo, cGrp, gGrp, groupShow) => [
         buildSingleMeasureLeaf(mc, combo, cGrp, gGrp, groupShow),
       ];
       return {
         headerName: mc.label,
         groupId: `measure__${mc.dataValue}`,
-        headerClass: [band.header, "pvt-header-group-top"],
+        headerClass: band.headerClass,
         children: buildColGroups(
           colCombos,
           0,
-          band.header,
-          band.cell,
+          band.g,
+          band.c,
           leafBuilder,
           false,
         ),
@@ -920,11 +840,7 @@ export function buildManualColDefs({
         markFirstLeaf(col.children[0]);
         return;
       }
-      const cc = Array.isArray(col.cellClass)
-        ? col.cellClass
-        : col.cellClass
-          ? [col.cellClass]
-          : [];
+      const cc = toClassArray(col.cellClass);
       if (!cc.includes("dd-grp-start")) col.cellClass = [...cc, "dd-grp-start"];
     };
     valueGroups.forEach(markFirstLeaf);
