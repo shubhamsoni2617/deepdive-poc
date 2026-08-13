@@ -995,15 +995,16 @@
   background-color: #eceafb !important;
 }
 
-/* Column headers only — light #f5f6fa background. */
+/* Column headers — white surface, matching ux-cypher (--surface). Hierarchy /
+   grouping is conveyed by the accent underline + divider lines, not a fill. */
 .dd-grid .ag-header {
-  background-color: #f5f6fa !important;
+  background-color: #ffffff !important;
 }
 .dd-grid .ag-header-cell,
 .dd-grid .ag-header-group-cell,
 .dd-grid .pvt-header-group-a,
 .dd-grid .pvt-header-group-b {
-  background-color: #f5f6fa !important;
+  background-color: #ffffff !important;
 }
 
 /* Top-level group header — mirrors impact-ui's table-v32 column-group headers:
@@ -1252,29 +1253,33 @@
   background-color: #ffffff !important;
 }
 
-/* Alternating hierarchy-group banding (subtle gray band per group) */
+/* No alternating group banding — ux-cypher keeps uniform white rows and conveys
+   hierarchy through indentation + node divider lines only. */
 .dd-grid .ag-row.dd-group-alt .ag-cell,
 .dd-grid.dd-manual .ag-row.dd-group-alt .ag-cell {
-  background-color: #f7f7fb !important;
+  background-color: #ffffff !important;
 }
 
-/* Editable-style unit cells: a soft lavender wash frames a white rounded field,
-   matching ux-cypher's editable cell. The two-layer background paints white in
-   the padding box (the field) and lavender in the border box (the wash). */
+/* Editable unit cells render plain like every other value cell in the demo
+   (just a right-aligned number on thin gridlines). The framed input look only
+   appears while the cell is focused/being edited — matching ux-cypher, where a
+   read-only WCF value is indistinguishable from the other measure rows until
+   you click into it. */
 .dd-grid .ag-cell.dd-input-cell,
 .dd-grid.dd-manual .ag-row .ag-cell.dd-input-cell,
 .dd-grid.dd-manual .ag-row.dd-group-alt .ag-cell.dd-input-cell {
-  background:
-    linear-gradient(#ffffff, #ffffff) padding-box,
-    linear-gradient(#eceefd, #eceefd) border-box !important;
-  border: 5px solid transparent !important;
-  box-shadow: inset 0 0 0 1px #cdd3f5;
-  border-radius: 6px;
+  background-color: #ffffff !important;
+  border: none !important;
+  border-left: 1px solid #eef0f4 !important;
+  box-shadow: none;
+  border-radius: 0;
 }
 
-/* Focused / active editable cell — blue ring to match ux-cypher */
+/* Focused / active editable cell — soft lavender field + blue ring, shown only
+   on interaction (matches ux-cypher's editable cell). */
 .dd-grid .ag-cell.dd-input-cell:focus-within,
 .dd-grid .ag-cell.dd-input-cell.ag-cell-focus {
+  background-color: #ffffff !important;
   box-shadow: inset 0 0 0 1.5px #4259ee !important;
 }
 

@@ -64,15 +64,15 @@ function buildPayload({
   fiscalIds,
 }) {
   return {
-    // Declares the row (y) / cell (x) axes so /pivot routes to the contract
-    // row builder (runContractRows). Rows: Product ▸ Store ▸ Measure;
-    // Columns: Time ▸ Metric.
+    // Declares the axes so /pivot routes to the general contract builder
+    // (runContractRows). X (row identity + leaf): product ▸ location ▸ metric;
+    // Y (nested in the `measures` value block): measure ▸ time.
     dimension: [
-      { dimension: "product", axis: "y" },
-      { dimension: "location", axis: "y" },
-      { dimension: "measure", axis: "y" },
-      { dimension: "time", axis: "x" },
-      { dimension: "metric", axis: "x" },
+      { order: "1", dimension: "product", axis: "x" },
+      { order: "2", dimension: "location", axis: "x" },
+      { order: "3", dimension: "metric", axis: "x" },
+      { order: "1", dimension: "measure", axis: "y" },
+      { order: "2", dimension: "time", axis: "y" },
     ],
     filters: GLOBAL_FILTERS,
     grid_filters: gridFilters,
@@ -104,39 +104,21 @@ function rowIdentity(row) {
 }
 
 /**
- * Group the contract's measure-separated rows into one node per
- * (product, location) identity. Each node carries `measureCells`
- * ({ measure -> cells }) and the ordered measure list, so the grid can render
- * one sub-row per measure (WCF/MFP) under each product/location node.
+ * Map contract rows to client tree nodes. Each row already carries ALL measures
+ * in its `measures` block ({ measure -> time -> { metric } }), so there is one
+ * node per (product, location) identity — no measure-row grouping needed.
  */
 function groupRows(rows, ctx) {
-  const order = [];
-  const byId = new Map();
-  (rows || []).forEach((row) => {
-    const key = rowIdentity(row);
-    if (!byId.has(key)) {
-      byId.set(key, []);
-      order.push(key);
-    }
-    byId.get(key).push(row);
-  });
-  return order.map((key) => makeNode(byId.get(key), ctx));
+  return (rows || []).map((row) => makeNode(row, ctx));
 }
 
-/** Turn a group of measure-rows (same identity) into a client tree node. */
+/** Turn a single contract row into a client tree node. */
 function makeNode(
-  groupRowsList,
+  row,
   { depth, dim, productPath, locationPath, prodAgg, locAgg },
 ) {
-  const row = groupRowsList[0];
-  const measureCells = {};
-  const measureOrder = [];
-  groupRowsList.forEach((r) => {
-    const m = r.measure?.value;
-    if (m == null) return;
-    if (!(m in measureCells)) measureOrder.push(m);
-    measureCells[m] = r.cells || {};
-  });
+  const measureCells = row.measures || {};
+  const measureOrder = Object.keys(measureCells);
   const id = [...productPath, ...locationPath]
     .map((p) => `${p.dimension}:${p.attribute_name}=${p.values[0]}`)
     .concat(rowIdentity(row))

@@ -12,7 +12,6 @@ import {
   formatCurrency,
   formatPercent,
 } from "../format/formatters";
-import { metricLeafLabel } from "../config/contractMetrics";
 import { labelTime } from "../config/timeAxis";
 
 const fmtInt = (v) => formatNumber(v, 0);
@@ -49,7 +48,8 @@ export function buildValueColumns(sampleCells, timeOrder, metrics) {
       // Leaf: emit a column per requested metric (stable order + formatting).
       return metrics.map((mk) => {
         const meta = metricMeta(mk);
-        const label = metricLeafLabel(mk);
+        // Leaf keys in the contract response are the RAW metric keys (sls_u…).
+        const label = mk;
         return {
           headerName: meta.head,
           colId: [...path, label].join("/"),
