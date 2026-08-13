@@ -1,7 +1,7 @@
 // Deterministic base-grain mock data generator for the DemandSmart pivot PoC.
 // Each record is Product x Store x Time x Measure.
 
-import { MEASURES } from "./constants";
+import { MEASURES } from "./constants.js";
 
 const SEED = 42;
 

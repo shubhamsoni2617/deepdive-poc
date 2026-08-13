@@ -7,15 +7,12 @@ import {
   addRecordComponents,
 } from "./config/metrics";
 import { runPivotQuery } from "./db/pivotQuery";
+import { runGenericPivot } from "./db/genericPivot";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function fetchDeepDiveData(payload = {}) {
-  await delay(300);
-
-  const { arrangement = null, levels = null } = payload;
+function localDeepDiveData({ arrangement = null, levels = null } = {}) {
   const data = generateMockData();
-
   return {
     success: true,
     data,
@@ -37,6 +34,83 @@ export async function fetchDeepDiveData(payload = {}) {
   };
 }
 
+/**
+ * Loads the flat base-grain records the grid pivots in-browser. Reads from the
+ * backend (`GET /api/deep-dive/records`); falls back to local generation if the
+ * server is unavailable so the PoC still runs offline.
+ */
+export async function fetchDeepDiveData(payload = {}) {
+  try {
+    const res = await fetch("/api/deep-dive/records");
+    if (!res.ok) throw new Error(`records HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json?.data) throw new Error("records: empty payload");
+    return json;
+  } catch (err) {
+    console.warn(
+      "[fetchDeepDiveData] backend unavailable, using local mock:",
+      err.message,
+    );
+    await delay(150);
+    return localDeepDiveData(payload);
+  }
+}
+
+/**
+ * Fetch records pre-aggregated to the current view's grain from the backend
+ * (`POST /api/deep-dive/aggregate`). The grid's pivot engine consumes these
+ * exactly like base-grain records but the payload scales with the view, not
+ * the raw fact count. Falls back to filtering the locally generated base data
+ * if the server is unavailable.
+ */
+export async function fetchAggregatedRecords({
+  rowFields = [],
+  colFields = [],
+  measures = [],
+} = {}) {
+  try {
+    const res = await fetch("/api/deep-dive/aggregate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowFields, colFields, measures }),
+    });
+    if (!res.ok) throw new Error(`aggregate HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json?.data) throw new Error("aggregate: empty payload");
+    return json;
+  } catch (err) {
+    console.warn(
+      "[fetchAggregatedRecords] backend unavailable, aggregating locally:",
+      err.message,
+    );
+    await delay(120);
+    return localAggregate({ rowFields, colFields, measures });
+  }
+}
+
+/** Local mirror of the server aggregation (offline fallback). */
+function localAggregate({ rowFields = [], colFields = [], measures = [] }) {
+  const grainFields = Array.from(new Set([...rowFields, ...colFields]));
+  const measureSet = measures.length ? new Set(measures) : null;
+  const groups = new Map();
+  for (const r of generateMockData()) {
+    if (measureSet && !measureSet.has(r.measure)) continue;
+    const key = [...grainFields.map((f) => r[f]), r.measure].join("\u0001");
+    let g = groups.get(key);
+    if (!g) {
+      g = {};
+      grainFields.forEach((f) => (g[f] = r[f]));
+      g.measure = r.measure;
+      Object.assign(g, emptyComponents());
+      groups.set(key, g);
+    }
+    addRecordComponents(g, r);
+  }
+  let id = 1;
+  const data = Array.from(groups.values()).map((g) => ({ id: id++, ...g }));
+  return { data, meta: { totalRecords: data.length } };
+}
+
 export async function applyArrangement(payload) {
   await delay(100);
   return {
@@ -47,12 +121,26 @@ export async function applyArrangement(payload) {
 }
 
 export async function saveEdits(payload) {
-  await delay(500);
-  return {
-    success: true,
-    version: Date.now(),
-    updatedCount: payload?.records?.length ?? 0,
-  };
+  try {
+    const res = await fetch("/api/deep-dive/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ records: payload?.records ?? [] }),
+    });
+    if (!res.ok) throw new Error(`save HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(
+      "[saveEdits] backend unavailable, acknowledging locally:",
+      err.message,
+    );
+    await delay(300);
+    return {
+      success: true,
+      version: Date.now(),
+      updatedCount: payload?.records?.length ?? 0,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -371,8 +459,41 @@ export async function fetchDeepDiveEdits(payload = {}) {
 // and returns the agreed row/column response shape.
 // ---------------------------------------------------------------------------
 
-/** Mock of `POST /api/deep-dive/pivot` — selection-driven aggregation. */
+/**
+ * `POST /api/deep-dive/pivot` — selection-driven aggregation.
+ *
+ * Calls the real Express + SQLite backend. If it's unreachable (server not
+ * started), transparently falls back to the in-browser aggregation over the
+ * same deterministic dataset so the PoC still works offline.
+ */
 export async function fetchPivotTable(payload = {}) {
-  await delay(250);
-  return runPivotQuery(payload);
+  const isGeneric = payload.enumerate != null || Array.isArray(payload.columns);
+  try {
+    const res = await fetch("/api/deep-dive/pivot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`pivot HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(
+      "[fetchPivotTable] backend unavailable, using local mock:",
+      err.message,
+    );
+    await delay(150);
+    if (isContract) return runContractRows(payload);
+    return isGeneric ? runGenericPivot(payload) : runPivotQuery(payload);
+  }
+}
+
+/** `POST /api/deep-dive/edits` — write-back to the granular facts. */
+export async function savePivotEdits(payload = {}) {
+  const res = await fetch("/api/deep-dive/edits", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`edits HTTP ${res.status}`);
+  return await res.json();
 }

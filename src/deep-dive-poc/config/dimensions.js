@@ -55,8 +55,8 @@ export const MEASURE_LEVEL_TO_ROW = { slsU: "WCF", mfp: "MFP", ly: "LY" };
 // Metric definitions (label/editable/aggregation/format) live in ./metrics so
 // there is exactly one source of truth. METRIC_LEVELS is re-exported here only
 // to keep LEVELS_BY_DIMENSION assembled in one place.
-export { METRIC_LEVELS } from "./metrics";
-import { METRIC_LEVELS } from "./metrics";
+export { METRIC_LEVELS } from "./metrics.js";
+import { METRIC_LEVELS } from "./metrics.js";
 
 export const LEVELS_BY_DIMENSION = {
   [DIMENSIONS.PRODUCT]: PRODUCT_LEVELS,

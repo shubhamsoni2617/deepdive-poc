@@ -13,21 +13,30 @@
  * divide summed components so they aggregate correctly.
  */
 
-import { formatCurrency, formatNumber, formatPercent } from "../format/formatters";
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+} from "../format/formatters.js";
 
 /** Additive raw fields carried on every component object. */
 export const COMPONENT_FIELDS = ["slsU", "sls$", "gm$", "mfp", "ly", "varLY"];
 
 export function emptyComponents() {
-  return { slsU: 0, "sls$": 0, gm$: 0, mfp: 0, ly: 0, varLY: 0, _n: 0 };
+  return { slsU: 0, sls$: 0, gm$: 0, mfp: 0, ly: 0, varLY: 0, _n: 0 };
 }
 
-/** Accumulate a raw data record into a component object (mutates + returns). */
+/**
+ * Accumulate a data record into a component object (mutates + returns).
+ * A raw base-grain record counts as 1; a pre-aggregated record carries its own
+ * `_n` (the number of base rows it summarizes) so ratio/average metrics such as
+ * varLY stay correct after server-side aggregation.
+ */
 export function addRecordComponents(target, r) {
   COMPONENT_FIELDS.forEach((f) => {
     target[f] += r[f] || 0;
   });
-  target._n += 1;
+  target._n += r._n != null ? r._n : 1;
   return target;
 }
 

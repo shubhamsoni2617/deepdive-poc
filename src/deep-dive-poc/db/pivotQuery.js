@@ -26,7 +26,7 @@ import {
   computeMetric,
   DIM_LEVELS,
   MEASURES as ALL_MEASURES,
-} from "./deepDiveDb";
+} from "./deepDiveDb.js";
 
 // Dimension name -> response block key. Store renders as "location".
 const BLOCK_KEY = { product: "product", store: "location", time: "time" };
@@ -123,7 +123,7 @@ function sumForWeeks(index, measure, weeks) {
  * Main entry. Returns { grid_id, parent_grid_id, context, rows, pagination,
  * meta } aggregated from the fact table per the payload selection.
  */
-export function runPivotQuery(payload = {}) {
+export function runPivotQuery(payload = {}, factsOverride = null) {
   const {
     filters = [],
     grid_filters = [],
@@ -141,16 +141,20 @@ export function runPivotQuery(payload = {}) {
   const { y: yDims, x: xDims } = splitAxes(dimension);
 
   // ---- 1. Scope the facts: page filters + drill path + week range + measures.
-  let facts = getFacts();
+  // `factsOverride` lets a real backend feed rows straight from SQL (already
+  // scoped); the same filters are re-applied here idempotently.
+  let facts = factsOverride || getFacts();
   facts = applyFilterList(facts, filters);
   facts = applyFilterList(facts, grid_filters);
 
-  const weekKeys = (fiscal_ids.length
-    ? fiscal_ids
-    : (time_period.fiscal_mapping || []).map((m) => m.fiscal_year_week)
+  const weekKeys = (
+    fiscal_ids.length
+      ? fiscal_ids
+      : (time_period.fiscal_mapping || []).map((m) => m.fiscal_year_week)
   ).map(Number);
   const weekSet = new Set(weekKeys);
-  if (weekSet.size) facts = facts.filter((f) => weekSet.has(f.fiscal_year_week));
+  if (weekSet.size)
+    facts = facts.filter((f) => weekSet.has(f.fiscal_year_week));
   facts = facts.filter((f) => measures.includes(f.measure));
 
   // week -> { month, quarter } for column-side time bucketing.
@@ -219,7 +223,7 @@ export function runPivotQuery(payload = {}) {
         const bucket =
           level.aggAttr === "fiscal_year_week"
             ? wk
-            : meta2[level.aggAttr] ?? wk;
+            : (meta2[level.aggAttr] ?? wk);
         if (!buckets.has(bucket)) buckets.set(bucket, []);
         buckets.get(bucket).push(wk);
       });

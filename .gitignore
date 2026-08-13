@@ -23,3 +23,8 @@ node_modules
 
 # Local Netlify folder
 .netlify
+
+# SQLite database (regenerated/seeded on server start)
+server/deepdive.db
+server/deepdive.db-shm
+server/deepdive.db-wal

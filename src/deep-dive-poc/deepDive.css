@@ -1,3 +1,110 @@
+/* Contract-driven grid: breadcrumb + drill cells */
+.dd-contract {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.dd-bc-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+  font-size: 12px;
+}
+.dd-bc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dd-bc-dim {
+  font-weight: 600;
+  color: #374151;
+}
+.dd-bc-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dd-bc-sep {
+  color: #9ca3af;
+}
+.dd-bc-link {
+  border: none;
+  background: none;
+  color: #4f46e5;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+}
+.dd-bc-link:disabled {
+  color: #111827;
+  cursor: default;
+  font-weight: 600;
+}
+.dd-bc-level {
+  color: #6b7280;
+  font-style: italic;
+}
+.dd-bc-reset {
+  margin-left: auto;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.dd-contract-grid {
+  flex: 1;
+  min-height: 0;
+}
+.dd-drill-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dd-drill-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #4f46e5;
+  padding: 0;
+  width: 16px;
+  line-height: 1;
+}
+.dd-drill-chevron {
+  font-size: 16px;
+  font-weight: 700;
+}
+.dd-drill-spacer {
+  display: inline-block;
+  width: 16px;
+}
+.dd-drill-value {
+  font-weight: 500;
+}
+.dd-measure-head {
+  font-weight: 700;
+}
+.dd-metric-head {
+  color: #6b7280;
+}
+.dd-month-head {
+  font-weight: 600;
+  color: #374151;
+}
+.dd-week-head {
+  font-weight: 500;
+  color: #4b5563;
+}
+.dd-grid .dd-num-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Remove the Vite template's fixed-width root styling */
 #root {
   width: 100%;

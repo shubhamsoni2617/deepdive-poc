@@ -1,6 +1,5 @@
 import { useState } from "react";
 import "./agGridSetup";
-import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import "./deepDive.css";
@@ -8,6 +7,9 @@ import { ARRANGEMENTS, LEVELS_BY_DIMENSION, METRICS } from "./constants";
 import { useDeepDivePivot } from "./useDeepDivePivot";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { PivotBuilder, PivotTableIcon } from "./PivotBuilder.jsx";
+import ServerDrillGrid from "./ServerDrillGrid.jsx";
+import { MEASURE_LEVEL_TO_ROW } from "./config/dimensions";
+import { CLIENT_TO_CONTRACT_METRIC } from "./config/contractMetrics";
 
 function Toggle({ checked, onChange, label }) {
   return (
@@ -63,7 +65,13 @@ export default function DeepDiveApp() {
     save,
   } = useDeepDivePivot();
 
-  console.log(records, "szdsf", gridOptions);
+  // Map the current selection onto the /pivot contract vocabulary.
+  const serverMeasures = (levels.measures || [])
+    .map((k) => MEASURE_LEVEL_TO_ROW[k])
+    .filter(Boolean);
+  const serverMetrics = visibleMetrics
+    .map((k) => CLIENT_TO_CONTRACT_METRIC[k])
+    .filter(Boolean);
 
   const handleLevelChange = (dimension, next) => {
     const order = LEVELS_BY_DIMENSION[dimension].map((l) => l.key);
@@ -278,46 +286,16 @@ export default function DeepDiveApp() {
                   </div>
                 </div>
 
-                <div
-                  className={
-                    "dd-grid ag-theme-alpine" +
-                    (arrangement.rows.includes("measures") ||
-                    arrangement.rows.includes("metrics")
-                      ? " dd-manual"
-                      : "") +
-                    (arrangement.columns.filter((d) => d !== "metrics").length +
-                      1 >
-                    2
-                      ? " dd-alt-cols"
-                      : "")
+                <ServerDrillGrid
+                  measures={
+                    serverMeasures.length ? serverMeasures : ["WCF", "MFP"]
                   }
-                >
-                  {loading ? (
-                    <div className="dd-loading">Loading mock data…</div>
-                  ) : (
-                    <AgGridReact
-                      key={
-                        "v2" +
-                        arrangement.id +
-                        arrangement.rows.join(",") +
-                        arrangement.columns.join(",") +
-                        JSON.stringify(levels) +
-                        JSON.stringify(visibleMetrics) +
-                        String(compact)
-                      }
-                      gridOptions={gridOptions}
-                      columnDefs={gridOptions.columnDefs}
-                      context={gridOptions.context}
-                      rowData={records}
-                      rowClassRules={{
-                        "dd-row-mid": (p) =>
-                          p.data && p.data.__isLast === false,
-                        "dd-row-cover": (p) =>
-                          p.data && p.data.__isFirst === false,
-                      }}
-                    />
-                  )}
-                </div>
+                  metrics={
+                    serverMetrics.length ? serverMetrics : ["sls_u", "aur"]
+                  }
+                  timeOrder={["week"]}
+                  compact={compact}
+                />
               </main>
 
               {/* Pivot table settings - right drawer */}

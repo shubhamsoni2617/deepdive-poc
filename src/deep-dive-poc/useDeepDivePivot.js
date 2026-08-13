@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { fetchDeepDiveData, saveEdits } from "./api";
+import { fetchAggregatedRecords, saveEdits } from "./api";
 import {
   MEASURE_LEVEL_TO_ROW,
   DEFAULT_LEVELS,
@@ -50,26 +50,6 @@ export function useDeepDivePivot() {
     columnFieldsRef.current = fields.columnFields;
   }, [arrangement, levels]);
 
-  useEffect(() => {
-    let mounted = true;
-    fetchDeepDiveData({
-      arrangement: DEFAULT_ARRANGEMENT,
-      levels: DEFAULT_LEVELS,
-    })
-      .then((res) => {
-        if (!mounted) return;
-        setRecords(res.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   // Arrangement classification drives every downstream mode decision.
   const { metricsInRows, manualPivotActive, innerIsMetric, bothInner } =
     useMemo(() => classifyArrangement(arrangement), [arrangement]);
@@ -95,6 +75,39 @@ export function useDeepDivePivot() {
     () => expandLevelFields(arrangement.columns, levels),
     [arrangement, levels],
   );
+
+  // Selected measure data-values (row values); empty => all measures.
+  const selectedMeasures = useMemo(
+    () =>
+      (levels.measures || [])
+        .map((k) => MEASURE_LEVEL_TO_ROW[k])
+        .filter(Boolean),
+    [levels],
+  );
+
+  // Fetch records pre-aggregated to the current view's grain (row + column
+  // level-fields) from the backend. Refetches whenever the grain or the
+  // selected measures change; drilling within the returned levels stays a pure
+  // client-side operation (no per-expand round-trip).
+  const grainKey = useMemo(
+    () =>
+      [
+        rowLevelFields.join(","),
+        colLevelFields.join(","),
+        selectedMeasures.join(","),
+      ].join("|"),
+    [rowLevelFields, colLevelFields, selectedMeasures],
+  );
+
+  // NOTE: data no longer flows through this hook. The grid is fully
+  // server-driven via the /pivot contract (see ServerDrillGrid /
+  // useServerDrillTree). This hook now only owns the view controls (arrangement,
+  // levels, measures/metrics selection, compact/flip). Kept intentionally free
+  // of any /aggregate or /records fetch so ONLY /pivot calls happen.
+  useEffect(() => {
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grainKey]);
 
   // Ordered measure data-values in selection order (fallback to data order).
   const orderedMeasures = useMemo(() => {

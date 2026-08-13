@@ -1,0 +1,23 @@
+{
+  "filters": [
+    { "filter_type": "cascaded", "attribute_name": "country", "operator": "in", "dimension": "store", "values": ["USA"] }
+  ],
+  "grid_filters": [],
+  "grid_id": "g1",
+  "product_hierarchy_levels": { "l1": "l0_code", "l2": "l1_name", "l3": "l3_name", "l4": "l4_name", "l5": "product_code" },
+  "location_hierarchy_levels": { "l1": "country", "l2": "state", "l3": "district", "l4": "city", "l5": "store_code" },
+  "dimension": [
+    { "order": "1", "dimension": "product", "axis": "y" },
+    { "order": "2", "dimension": "store", "axis": "y" },
+    { "order": "3", "dimension": "metric", "axis": "y" },
+    { "order": "1", "dimension": "measure", "axis": "x" },
+    { "order": "2", "dimension": "time", "axis": "x" }
+  ],
+  "product_hierarchy_aggregation": "l1_name",
+  "location_hierarchy_aggregation": null,
+  "time_hierarchy_aggregation": "fiscal_year_month",
+  "forecast_attributes": ["WCF", "MFP"],
+  "metrics": ["sls_u", "aur"],
+  "fiscal_ids": ["202601", "202602", "202603", "202604", "202605", "202606", "202607", "202608"],
+  "meta": { "paginated_rows": true, "limit": 10, "page": 1 }
+}
