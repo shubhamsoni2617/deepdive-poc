@@ -7,10 +7,12 @@
  */
 
 // Client-facing metric keys (config/metrics.js) -> contract metric keys.
+// Keys mirror the real backend contract (sls_dollars/gm_dollars/…).
 export const CLIENT_TO_CONTRACT_METRIC = {
   slsU: "sls_u",
-  sls$: "sls_d",
-  gm$: "gm_d",
+  sls$: "sls_dollars",
+  cogs: "cogs",
+  gm$: "gm_dollars",
   aur: "aur",
   auc: "auc",
   "gm%": "gm_pct",

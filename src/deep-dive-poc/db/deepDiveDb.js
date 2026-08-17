@@ -59,10 +59,13 @@ const MEASURE_FACTOR = { WCF: 1, MFP: 0.97 };
 // aggregate correctly at ANY level.
 // --------------------------------------------------------------------------
 
+// Public metric keys match the real backend contract (sls_dollars, gm_dollars).
+// The `c.*` reads are the raw additive fact components (unchanged DB columns).
 export const METRIC_DEFS = {
   sls_u: { additive: true, compute: (c) => c.sls_u },
-  sls_d: { additive: true, compute: (c) => c.sls_d },
-  gm_d: { additive: true, compute: (c) => c.gm_d },
+  sls_dollars: { additive: true, compute: (c) => c.sls_d },
+  cogs: { additive: true, compute: (c) => c.sls_d - c.gm_d },
+  gm_dollars: { additive: true, compute: (c) => c.gm_d },
   aur: { compute: (c) => (c.sls_u ? c.sls_d / c.sls_u : null) },
   auc: { compute: (c) => (c.sls_u ? (c.sls_d - c.gm_d) / c.sls_u : null) },
   gm_pct: { compute: (c) => (c.sls_d ? (c.gm_d / c.sls_d) * 100 : null) },
@@ -125,25 +128,75 @@ function buildProductDim() {
 }
 
 function buildLocationDim() {
-  const country = "USA";
-  const states = ["TX", "CA"];
-  const citiesByState = {
-    TX: ["Austin", "Dallas"],
-    CA: ["LA", "SF"],
-  };
+  // ~50 countries. Each carries a compact state → district → city → store
+  // sub-hierarchy so drill-down keeps working while the fact table stays light
+  // (24 SKUs × 50 stores × 26 weeks × 2 measures ≈ 62k facts).
+  const countries = [
+    "USA",
+    "Canada",
+    "Mexico",
+    "Brazil",
+    "Argentina",
+    "Chile",
+    "Colombia",
+    "Peru",
+    "United Kingdom",
+    "Ireland",
+    "France",
+    "Germany",
+    "Spain",
+    "Italy",
+    "Portugal",
+    "Netherlands",
+    "Belgium",
+    "Switzerland",
+    "Austria",
+    "Sweden",
+    "Norway",
+    "Denmark",
+    "Finland",
+    "Poland",
+    "Czechia",
+    "Hungary",
+    "Greece",
+    "Romania",
+    "Ukraine",
+    "Turkey",
+    "Saudi Arabia",
+    "UAE",
+    "Israel",
+    "Egypt",
+    "South Africa",
+    "Nigeria",
+    "Kenya",
+    "Morocco",
+    "India",
+    "Pakistan",
+    "Bangladesh",
+    "China",
+    "Japan",
+    "South Korea",
+    "Indonesia",
+    "Thailand",
+    "Vietnam",
+    "Malaysia",
+    "Singapore",
+    "Australia",
+    "New Zealand",
+  ];
+
   const stores = [];
-  states.forEach((state) => {
+  countries.forEach((country, ci) => {
+    const code = `C${(ci + 1).toString().padStart(2, "0")}`; // unique per country
+    const state = `${code}-R1`;
     const district = `${state}-D1`;
-    citiesByState[state].forEach((city) => {
-      for (let n = 1; n <= 2; n++) {
-        stores.push({
-          country,
-          state,
-          district,
-          city,
-          store_code: `${state}-${city.slice(0, 2).toUpperCase()}-${n}`,
-        });
-      }
+    const city = `${country} Metro`;
+    stores.push({
+      country,
+      state,
+      district,
+      city,
+      store_code: `${code}-S1`,
     });
   });
   return stores;

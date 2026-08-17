@@ -27,10 +27,12 @@ export const PRODUCT_LEVELS = [
   { key: "sku", label: "SKU" },
 ];
 
+// Location hierarchy matches the seeded DB (Country ▸ State ▸ City ▸ Store).
 export const STORE_LEVELS = [
-  { key: "channel", label: "Channel" },
+  { key: "country", label: "Country" },
   { key: "state", label: "State" },
-  { key: "storeId", label: "Store ID" },
+  { key: "city", label: "City" },
+  { key: "store", label: "Store" },
 ];
 
 export const TIME_LEVELS = [
@@ -68,7 +70,7 @@ export const LEVELS_BY_DIMENSION = {
 
 export const DEFAULT_LEVELS = {
   [DIMENSIONS.PRODUCT]: ["division", "department", "sku"],
-  [DIMENSIONS.STORE]: ["channel", "storeId"],
+  [DIMENSIONS.STORE]: ["country", "state", "store"],
   [DIMENSIONS.TIME]: ["week"],
   [DIMENSIONS.MEASURES]: ["slsU", "mfp"],
   [DIMENSIONS.METRICS]: ["slsU", "aur"],

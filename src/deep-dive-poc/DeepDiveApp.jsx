@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import "./agGridSetup";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
@@ -8,8 +8,7 @@ import { useDeepDivePivot } from "./useDeepDivePivot";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { PivotBuilder, PivotTableIcon } from "./PivotBuilder.jsx";
 import ServerDrillGrid from "./ServerDrillGrid.jsx";
-import { MEASURE_LEVEL_TO_ROW } from "./config/dimensions";
-import { CLIENT_TO_CONTRACT_METRIC } from "./config/contractMetrics";
+import { buildRequestConfig } from "./model/contractRequest";
 
 function Toggle({ checked, onChange, label }) {
   return (
@@ -65,13 +64,14 @@ export default function DeepDiveApp() {
     save,
   } = useDeepDivePivot();
 
-  // Map the current selection onto the /pivot contract vocabulary.
-  const serverMeasures = (levels.measures || [])
-    .map((k) => MEASURE_LEVEL_TO_ROW[k])
-    .filter(Boolean);
-  const serverMetrics = visibleMetrics
-    .map((k) => CLIENT_TO_CONTRACT_METRIC[k])
-    .filter(Boolean);
+  // Build the generic /pivot request config from the current pivot selection.
+  // Drives BOTH the request payload and the grid layout, so any arrangement /
+  // level / measure / metric combination is served + rendered. Time resolves to
+  // `week` only for now (month/quarter handled later).
+  const requestConfig = useMemo(
+    () => buildRequestConfig(arrangement, levels),
+    [arrangement, levels],
+  );
 
   const handleLevelChange = (dimension, next) => {
     const order = LEVELS_BY_DIMENSION[dimension].map((l) => l.key);
@@ -286,16 +286,7 @@ export default function DeepDiveApp() {
                   </div>
                 </div>
 
-                <ServerDrillGrid
-                  measures={
-                    serverMeasures.length ? serverMeasures : ["WCF", "MFP"]
-                  }
-                  metrics={
-                    serverMetrics.length ? serverMetrics : ["sls_u", "aur"]
-                  }
-                  timeOrder={["week"]}
-                  compact={compact}
-                />
+                <ServerDrillGrid config={requestConfig} compact={compact} />
               </main>
 
               {/* Pivot table settings - right drawer */}

@@ -3,24 +3,22 @@
  *
  * The response shape is derived entirely from the request `dimension` array
  * (each entry: { order, dimension, axis }). Sorting each axis by `order`:
- *   - X-dims EXCEPT the last become DIRECT KEYS on every response row
- *     (e.g. `product`, `location`) — they identify the row.
- *   - The LAST x-dim's members become the LEAF keys of the value block
- *     (e.g. `metric` -> { sls_u, aur, ... }).
- *   - All Y-dims nest, in order, inside the `measures` value block
- *     (e.g. measure -> time(quarter/month/week) -> { metric: value }).
+ *   - Hierarchy x-dims (product / store) become DIRECT KEYS on every response
+ *     row — they identify the row.
+ *   - VALUE dims (measure / time / metric) form the nested value block, in
+ *     x-order (outer) then y-order (inner), down to a numeric leaf.
+ *   - The block's field name follows its OUTER dim: measure -> `measures`,
+ *     metric -> `metrics`. Metric leaf keys are lowercase (sls_u, aur, …).
  *
  * Nothing is pre-aggregated: every leaf value is summed from the granular
  * facts on demand and ratio metrics are recomputed from summed components so
  * numbers are correct at any level.
  *
- * Row shape:
- *   {
- *     grid_id: "<deterministic id>",
- *     product:  { aggregation_level, attribute_name, value, has_children, next_level },
- *     location: { aggregation_level, value, has_children, next_level },
- *     measures: { <measure>: { <q>: { <m>: { <w>: { <metric>: value } } } } }
- *   }
+ * Row shape (value block attaches to the LAST x-dim):
+ *   // last x = a value dim (e.g. measure) -> top-level block
+ *   { grid_id, product, location, measures: { <measure>: { <week>: { <metric>: number } } } }
+ *   // last x = a hierarchy (e.g. store) -> block nested INSIDE that block
+ *   { grid_id, product, location: { …identity, measures: { <measure>: { <week>: { <metric>: number } } } } }
  *
  * Envelope: { message, status, rows }.
  */
@@ -120,6 +118,10 @@ function hierInfo(dimName, payload) {
 
 const isHierDim = (d) => d === "product" || d === "store" || d === "location";
 
+// Row (grouping) dims enumerate response rows. Time joins product/store here
+// when it is on the x-axis (in rows); it is NOT a value dim in that case.
+const isRowDim = (d) => isHierDim(d) || d === "time";
+
 /**
  * Enumerate the members of a hierarchy dimension over the given facts.
  * A "total" (undrilled) dimension yields a single { value: "Total" } node.
@@ -154,30 +156,33 @@ function enumerateHier(info, facts) {
   }));
 }
 
-/** Leaf metric object from summed components (raw metric keys). */
-function leafObject(facts, leafDim, payload) {
+/**
+ * Enumerate weeks as rows: one { time } block per fiscal_year_week. Time in rows
+ * is a non-drillable grouping dim (week leaf), so has_children is false.
+ */
+function enumerateTime(facts) {
+  return distinctSorted(facts, "fiscal_year_week").map((week) => ({
+    responseKey: "time",
+    block: {
+      aggregation_level: "week",
+      attribute_name: "fiscal_year_week",
+      value: week,
+      has_children: false,
+      next_level: null,
+    },
+    facts: facts.filter((f) => String(f.fiscal_year_week) === String(week)),
+  }));
+}
+
+/** Sum fact components then compute a single metric value (raw metric key). */
+function metricValue(facts, metric) {
   const comp = emptyComponents();
   facts.forEach((f) => addComponents(comp, f));
-  if (leafDim === "measure") {
-    // Leaf keyed by measures (rare arrangement) — value = first metric.
-    const metric = (payload.metrics || [])[0] || "sls_u";
-    const out = {};
-    (payload.measures || []).forEach((meas) => {
-      const c = emptyComponents();
-      facts
-        .filter((f) => f.measure === meas)
-        .forEach((f) => addComponents(c, f));
-      out[meas] = computeMetric(metric, c);
-    });
-    return out;
-  }
-  // Default / leafDim === "metric": one entry per requested metric.
-  const out = {};
-  (payload.metrics || []).forEach((m) => {
-    out[m] = computeMetric(m, comp);
-  });
-  return out;
+  return computeMetric(metric, comp);
 }
+
+/** Value dims that pivot the cells (vs hierarchy dims that identify rows). */
+const isValueDimName = (d) => d === "measure" || d === "time" || d === "metric";
 
 /** Nest facts by the selected time levels, continuing into `cont` at the leaf. */
 function nestTime(timeLevels, ti, facts, cont) {
@@ -192,31 +197,46 @@ function nestTime(timeLevels, ti, facts, cont) {
   return out;
 }
 
-/** Recursively nest the y-dimensions, then emit the leaf metric object. */
-function nestY(yDims, i, facts, payload, leafDim) {
-  if (i >= yDims.length) return leafObject(facts, leafDim, payload);
-  const dim = yDims[i];
-  const next = (f) => nestY(yDims, i + 1, f, payload, leafDim);
+/**
+ * Build the value block by nesting the value dims IN ORDER (measure/time/metric),
+ * carrying the fixed measure + metric down to a numeric leaf. Facts are narrowed
+ * by measure and week as we descend so ratio metrics recompute correctly.
+ */
+function buildValueTree(dims, idx, facts, payload, ctx) {
+  if (idx >= dims.length) {
+    const metric = ctx.metric || (payload.metrics || [])[0] || "sls_u";
+    return metricValue(facts, metric);
+  }
+  const dim = dims[idx];
+  const next = (f, c) => buildValueTree(dims, idx + 1, f, payload, c);
 
   if (dim === "measure") {
     const out = {};
     (payload.measures || []).forEach((meas) => {
-      out[meas] = next(facts.filter((f) => f.measure === meas));
+      out[meas] = next(
+        facts.filter((f) => f.measure === meas),
+        {
+          ...ctx,
+          measure: meas,
+        },
+      );
+    });
+    return out;
+  }
+  if (dim === "metric") {
+    const out = {};
+    (payload.metrics || []).forEach((mk) => {
+      out[mk] = next(facts, { ...ctx, metric: mk });
     });
     return out;
   }
   if (dim === "time") {
-    return nestTime(payload.time_order_selected || [], 0, facts, next);
+    return nestTime(payload.time_order_selected || [], 0, facts, (f) =>
+      next(f, ctx),
+    );
   }
-  if (isHierDim(dim)) {
-    const out = {};
-    enumerateHier(hierInfo(dim, payload), facts).forEach((m) => {
-      out[m.block.value] = next(m.facts);
-    });
-    return out;
-  }
-  // Unknown y-dim: skip a level.
-  return next(facts);
+  // Unknown value dim: skip a level.
+  return next(facts, ctx);
 }
 
 /** Deterministic, readable per-row id from its x-dim identity blocks. */
@@ -258,12 +278,25 @@ function scopeFacts(payload, factsOverride) {
 export function runContractRows(payload = {}, factsOverride = null) {
   let { xDims, yDims } = splitDimensions(payload.dimension);
   // Sensible defaults if no dimension array is supplied.
-  if (!xDims.length) xDims = ["product", "location", "metric"];
-  if (!yDims.length) yDims = ["measure", "time"];
+  if (!xDims.length) xDims = ["product", "location", "measure"];
+  if (!yDims.length) yDims = ["time", "metric"];
 
-  // X-dims except the last identify each row; the last is the metric leaf.
-  const rowKeyDims = xDims.slice(0, -1).filter(isHierDim);
-  const leafDim = xDims[xDims.length - 1];
+  // Row (grouping) x-dims identify each row (product/store/time); value dims
+  // (measure/metric on x, plus measure/metric/time on y) form the nested value
+  // block. Time on x is a row dim, NOT a value dim. The outer value dim sets the
+  // block field name.
+  const rowKeyDims = xDims.filter(isRowDim);
+  const valueDims = [
+    ...xDims.filter((d) => d === "measure" || d === "metric"),
+    ...yDims.filter(isValueDimName),
+  ];
+  const fieldName = valueDims[0] === "metric" ? "metrics" : "measures";
+
+  // The value block attaches to the LAST x-dim. When that dim is a row dim
+  // (hierarchy or time), nest the block INSIDE that dim's identity block (e.g.
+  // under `location` or `time`); otherwise it is a top-level row field.
+  const lastX = xDims[xDims.length - 1];
+  const nestInHier = isRowDim(lastX) && rowKeyDims.length > 0;
 
   const facts = scopeFacts(payload, factsOverride);
   const rows = [];
@@ -275,12 +308,23 @@ export function runContractRows(payload = {}, factsOverride = null) {
       acc.forEach((m) => {
         row[m.responseKey] = m.block;
       });
-      row.measures = nestY(yDims, 0, curFacts, payload, leafDim);
+      const tree = buildValueTree(valueDims, 0, curFacts, payload, {});
+      if (nestInHier) {
+        // Mutating the last hierarchy's block also updates row[responseKey]
+        // (same object reference), nesting the value tree under it.
+        acc[acc.length - 1].block[fieldName] = tree;
+      } else {
+        row[fieldName] = tree;
+      }
       rows.push(row);
       return;
     }
-    const info = hierInfo(rowKeyDims[idx], payload);
-    enumerateHier(info, curFacts).forEach((m) => {
+    const dim = rowKeyDims[idx];
+    const members =
+      dim === "time"
+        ? enumerateTime(curFacts)
+        : enumerateHier(hierInfo(dim, payload), curFacts);
+    members.forEach((m) => {
       walk(idx + 1, m.facts, [...acc, m]);
     });
   };

@@ -29,8 +29,8 @@ const isTotal = (a) => TOTAL.has(a);
 
 const METRIC_LABEL = {
   sls_u: "SLS",
-  sls_d: "SLS_D",
-  gm_d: "GM",
+  sls_dollars: "SLS_D",
+  gm_dollars: "GM",
   aur: "AUR",
   auc: "AUC",
   gm_pct: "GM_PCT",
@@ -51,7 +51,13 @@ const orderMap = (map) =>
     : [];
 
 const normDim = (d) =>
-  d === "measure" ? "measures" : d === "metric" ? "metrics" : d === "location" ? "store" : d;
+  d === "measure"
+    ? "measures"
+    : d === "metric"
+      ? "metrics"
+      : d === "location"
+        ? "store"
+        : d;
 
 function applyFilterList(facts, list) {
   if (!list || !list.length) return facts;
@@ -77,7 +83,8 @@ function dimToColumnFields(dim, ctx) {
   const d = normDim(dim);
   if (d === "measures") return [{ kind: "measure" }];
   if (d === "metrics") return [{ kind: "metric" }];
-  if (d === "time") return ctx.timeLevels.map((attr) => ({ kind: "time", attr }));
+  if (d === "time")
+    return ctx.timeLevels.map((attr) => ({ kind: "time", attr }));
   if (d === "product")
     return [{ kind: "hier", dim: "product", level: ctx.prodAgg }];
   if (d === "store") return [{ kind: "hier", dim: "store", level: ctx.locAgg }];
@@ -150,7 +157,11 @@ function buildColumnTree(leaves) {
     });
     return order.map((k) => {
       const members = map.get(k);
-      return { leaf: false, member: members[0].path[d], children: rec(members, d + 1) };
+      return {
+        leaf: false,
+        member: members[0].path[d],
+        children: rec(members, d + 1),
+      };
     });
   };
   return rec(leaves, 0);
@@ -287,7 +298,12 @@ export function runGenericPivot(payload = {}, factsOverride = null) {
     columns: columnTree,
     column_leaves: columnLeaves.map((l) => ({ id: l.id, path: l.path })),
     rows: members,
-    pagination: { page: 1, limit: members.length, total_rows: members.length, has_more: false },
+    pagination: {
+      page: 1,
+      limit: members.length,
+      total_rows: members.length,
+      has_more: false,
+    },
   };
 }
 
@@ -299,6 +315,10 @@ function resolveEnumerateField(enumerate, ctx) {
   if (kind === "metric") return { kind: "metric" };
   if (kind === "time") return { kind: "time", attr: enumerate.level };
   if (kind === "hier")
-    return { kind: "hier", dim: normDim(enumerate.dim), level: enumerate.level };
+    return {
+      kind: "hier",
+      dim: normDim(enumerate.dim),
+      level: enumerate.level,
+    };
   return null;
 }

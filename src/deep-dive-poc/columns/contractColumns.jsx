@@ -1,10 +1,13 @@
 /**
  * Column builders + cell renderers for the server-driven contract grid.
  *
- * Kept separate from ServerDrillGrid so the component stays a thin wrapper:
+ * GENERIC over the pivot selection (see model/contractRequest.js):
  *   - metricMeta:        metric key -> { header, formatter }
- *   - buildValueColumns: time ▸ metric column tree from a sample `cells` object
- *   - TreeCell:          pinned product/location tree cell with drill chevron
+ *   - buildValueColumns: nested column groups over the COLUMN value dims
+ *     (measure/week/metric, canonical nesting order), reading each cell by
+ *     merging the row's inner coordinate with the column's coordinate.
+ *   - TreeCell:          pinned hierarchy (product/location) tree cell + chevron
+ *   - InnerRowCell:      pinned label cell for an inner-row value dim
  */
 
 import {
@@ -13,14 +16,16 @@ import {
   formatPercent,
 } from "../format/formatters";
 import { labelTime } from "../config/timeAxis";
+import { DIMENSIONS } from "../config/dimensions";
 
 const fmtInt = (v) => formatNumber(v, 0);
 
 // Metric key -> short column header + value formatter.
 const METRIC_META = {
   sls_u: { head: "Sls U", fmt: fmtInt },
-  sls_d: { head: "Sls $", fmt: formatCurrency },
-  gm_d: { head: "GM $", fmt: formatCurrency },
+  sls_dollars: { head: "Sls $", fmt: formatCurrency },
+  cogs: { head: "COGS", fmt: formatCurrency },
+  gm_dollars: { head: "GM $", fmt: formatCurrency },
   aur: { head: "AUR", fmt: formatCurrency },
   auc: { head: "AUC", fmt: formatCurrency },
   gm_pct: { head: "GM%", fmt: formatPercent },
@@ -29,67 +34,175 @@ const METRIC_META = {
 export const metricMeta = (m) =>
   METRIC_META[m] || { head: String(m).toUpperCase(), fmt: fmtInt };
 
-const getPath = (obj, path) =>
-  path.reduce((o, k) => (o == null ? o : o[k]), obj);
+// Value-dimension -> the value-block key it contributes (canonical nest order).
+const CELL_KEY = {
+  [DIMENSIONS.MEASURES]: "measure",
+  [DIMENSIONS.TIME]: "week",
+  [DIMENSIONS.METRICS]: "metric",
+};
 
 /**
- * Build value columns from a sample measure's `cells` (time ▸ metric leaves).
- * Measure is NOT a column group here — it is an inner ROW dimension, so every
- * value column reads the CURRENT row's measure via `row.measure`.
+ * Ordered value-block nesting levels. Prefer the arrangement-driven order from
+ * the request config (cfg.blockLevels: row value-dims outer, then column
+ * value-dims), so navigate() reads the response in the SAME nesting the payload
+ * requested. Falls back to canonical measure ▸ week ▸ metric for older configs.
  */
-export function buildValueColumns(sampleCells, timeOrder, metrics) {
-  const buildTime = (node, path, depth) => {
-    const keys = Object.keys(node || {});
-    if (!keys.length) return [];
-    const first = node[keys[0]];
-    // Leaves are the innermost { SLS, AUR } objects whose values are numbers.
-    const isLeaf = first === null || typeof first === "number";
-    if (isLeaf) {
-      // Leaf: emit a column per requested metric (stable order + formatting).
-      return metrics.map((mk) => {
-        const meta = metricMeta(mk);
-        // Leaf keys in the contract response are the RAW metric keys (sls_u…).
-        const label = mk;
-        return {
-          headerName: meta.head,
-          colId: [...path, label].join("/"),
-          width: 92,
-          type: "numericColumn",
-          headerClass: "dd-metric-head",
-          cellClass: "dd-num-cell",
-          valueGetter: (p) => {
-            const cells = p.data?.node?.measureCells?.[p.data?.measure];
-            return getPath(cells, [...path, label]);
-          },
-          valueFormatter: (p) => meta.fmt(p.value),
-        };
-      });
+function blockLevels(cfg) {
+  if (Array.isArray(cfg.blockLevels) && cfg.blockLevels.length)
+    return cfg.blockLevels;
+  const has = (d) => cfg.innerRowDims.includes(d) || cfg.colDims.includes(d);
+  const levels = [];
+  if (has(DIMENSIONS.MEASURES)) levels.push("measure");
+  if (has(DIMENSIONS.TIME)) levels.push("week");
+  levels.push("metric");
+  return levels;
+}
+
+/** Walk the value block using a merged {measure,week,metric} coordinate. */
+function navigate(block, coord, levels) {
+  let cur = block;
+  for (const k of levels) {
+    if (cur == null) return null;
+    cur = cur[coord[k]];
+  }
+  return cur == null ? null : cur;
+}
+
+/** Member list for a COLUMN value dim, read from the sample block/config. */
+function colMembers(dim, cfg, sampleCells) {
+  if (dim === DIMENSIONS.MEASURES) return cfg.measures;
+  if (dim === DIMENSIONS.METRICS) return cfg.metrics;
+  if (dim === DIMENSIONS.TIME) {
+    // Week members live at the "week" level of the value block, whose depth
+    // depends on the arrangement's nesting order (e.g. measure ▸ week vs
+    // week ▸ measure). Descend by blockLevels until we reach "week" and read
+    // its keys — never assume a fixed depth.
+    const levels = blockLevels(cfg);
+    let cur = sampleCells || {};
+    for (const k of levels) {
+      if (cur == null) return [];
+      if (k === "week") {
+        return Object.keys(cur).sort((a, b) => Number(a) - Number(b));
+      }
+      const firstKey = Object.keys(cur)[0];
+      cur = firstKey != null ? cur[firstKey] : null;
     }
-    const levelName = timeOrder[depth] || "time";
-    return keys
-      .sort((a, b) => Number(a) - Number(b))
-      .map((k) => ({
-        headerName: labelTime(levelName, k),
-        groupId: [...path, k].join("/"),
-        headerClass: levelName === "week" ? "dd-week-head" : "dd-month-head",
-        children: buildTime(node[k], [...path, k], depth + 1),
-      }));
+    return [];
+  }
+  return [];
+}
+
+/** Header label for one member of a value dim. */
+function memberLabel(dim, member) {
+  if (dim === DIMENSIONS.METRICS) return metricMeta(member).head;
+  if (dim === DIMENSIONS.TIME) return labelTime("week", member);
+  return String(member); // measure value (WCF / MFP)
+}
+
+/** Formatter for a leaf cell: metric-driven (col metric, else the row metric). */
+function leafFormatter(lastDim, member) {
+  if (lastDim === DIMENSIONS.METRICS) {
+    const fmt = metricMeta(member).fmt;
+    return (p) => fmt(p.value);
+  }
+  // metric fixed by the row's inner coordinate.
+  return (p) => metricMeta(p.data?.coord?.metric).fmt(p.value);
+}
+
+/**
+ * Build value columns as nested groups over the COLUMN value dims. Each leaf
+ * column reads its cell by merging the row's inner coordinate (row.coord) with
+ * the column's fixed coordinate, then walking the value block.
+ */
+export function buildValueColumns(cfg, sampleCells) {
+  const levels = blockLevels(cfg);
+  const readCell = (data, colCoord) => {
+    if (!data?.node) return null;
+    return navigate(
+      data.node.measureCells,
+      { ...data.coord, ...colCoord },
+      levels,
+    );
   };
 
-  return buildTime(sampleCells, [], 0);
+  // No column value dims (all value dims are inner rows, or only a hierarchy is
+  // in columns): a single value column shows the row's fully-specified cell.
+  if (!cfg.colDims.length) {
+    return [
+      {
+        headerName: "Value",
+        colId: "__value",
+        width: 110,
+        type: "numericColumn",
+        headerClass: "dd-metric-head",
+        cellClass: "dd-num-cell",
+        valueGetter: (p) => readCell(p.data, {}),
+        valueFormatter: (p) => metricMeta(p.data?.coord?.metric).fmt(p.value),
+      },
+    ];
+  }
+
+  const build = (idx, pathCoord, pathIds) => {
+    const dim = cfg.colDims[idx];
+    const key = CELL_KEY[dim];
+    const isLast = idx === cfg.colDims.length - 1;
+    const members = colMembers(dim, cfg, sampleCells);
+    return members.map((m) => {
+      const coord = { ...pathCoord, [key]: m };
+      const ids = [...pathIds, `${key}=${m}`];
+      if (isLast) {
+        return {
+          headerName: memberLabel(dim, m),
+          colId: ids.join("/"),
+          width: 92,
+          type: "numericColumn",
+          headerClass:
+            dim === DIMENSIONS.TIME ? "dd-week-head" : "dd-metric-head",
+          cellClass: "dd-num-cell",
+          valueGetter: (p) => readCell(p.data, coord),
+          valueFormatter: leafFormatter(dim, m),
+        };
+      }
+      return {
+        headerName: memberLabel(dim, m),
+        groupId: ids.join("/"),
+        headerClass: dim === DIMENSIONS.TIME ? "dd-week-head" : "dd-month-head",
+        children: build(idx + 1, coord, ids),
+      };
+    });
+  };
+  return build(0, {}, []);
+}
+
+/** Pinned label cell for an inner-row value dim (Measure / Metric / Week). */
+export function InnerRowCell(props) {
+  const dim = props.colDef?.cellRendererParams?.dim;
+  const key = CELL_KEY[dim];
+  const member = props.data?.coord?.[key];
+  if (member == null) return <span />;
+  // Cell-merge: only render the label on the first row of this dim's group.
+  if (props.data?.__show && props.data.__show[key] === false) return <span />;
+  return <span>{memberLabel(dim, member)}</span>;
 }
 
 /** Pinned tree cell: indent + chevron (drills the given axis) + value. */
 export function TreeCell(props) {
   const dim = props.colDef?.cellRendererParams?.dim;
+  const isPrimary = props.colDef?.cellRendererParams?.primary;
   const node = props.data?.node;
-  const block = node?.[dim];
+  const block = node?.blocks?.[dim];
   if (!block) return <span className="dd-tree-cell" />;
 
-  // Cell-merge: only the FIRST measure sub-row of a node renders the label.
-  if (!props.data.__first) return <span className="dd-tree-cell" />;
+  // Cell-merge: render the label/chevron only on the first grid row of this
+  // column's contiguous run (same value + all columns to its left). This merges
+  // both a node's inner sub-rows AND repeated ancestor values across the child
+  // rows of a deeper drill (e.g. Product stays merged when Location is drilled).
+  const show = props.data.__showHier
+    ? props.data.__showHier[dim]
+    : props.data.__first;
+  if (!show) return <span className="dd-tree-cell" />;
 
-  const indent = dim === "product" ? node.depth * 16 : 8;
+  const indent = isPrimary ? node.depth * 16 : 8;
 
   const onToggle = (e) => {
     e.stopPropagation();
@@ -119,8 +232,23 @@ export function TreeCell(props) {
       <span
         className={`dd-tree-label${node.depth === 0 ? " dd-tree-label--top" : ""}`}
       >
-        {String(block.value)}
+        {dim === DIMENSIONS.TIME
+          ? labelTime("week", block.value)
+          : String(block.value)}
       </span>
     </span>
+  );
+}
+
+/** Full-width placeholder row shown while a node's next level is loading. */
+export function ShimmerRow(props) {
+  const depth = props.data?.depth ?? 1;
+  return (
+    <div className="dd-shimmer-row" style={{ paddingLeft: 16 + depth * 16 }}>
+      <span className="dd-shimmer-bar dd-shimmer-bar--label" />
+      <span className="dd-shimmer-bar" />
+      <span className="dd-shimmer-bar" />
+      <span className="dd-shimmer-bar" />
+    </div>
   );
 }

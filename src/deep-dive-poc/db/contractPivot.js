@@ -41,8 +41,8 @@ const isTotalAgg = (a) => TOTAL_TOKENS.has(a);
 // Metric key -> response label (leaf keys). Falls back to UPPERCASE.
 const METRIC_LABEL = {
   sls_u: "SLS",
-  sls_d: "SLS_D",
-  gm_d: "GM",
+  sls_dollars: "SLS_D",
+  gm_dollars: "GM",
   aur: "AUR",
   auc: "AUC",
   gm_pct: "GM_PCT",
@@ -182,7 +182,8 @@ export function runContractPivot(payload = {}, factsOverride = null) {
     fiscal_ids.length ? fiscal_ids : mapping.map((m) => m.fiscal_year_week)
   ).map(Number);
   const weekSet = new Set(weekKeys);
-  if (weekSet.size) facts = facts.filter((f) => weekSet.has(f.fiscal_year_week));
+  if (weekSet.size)
+    facts = facts.filter((f) => weekSet.has(f.fiscal_year_week));
   facts = facts.filter((f) => measures.includes(f.measure));
   // Fall back to the facts' own week/quarter/month if no mapping was supplied.
   weekKeys.forEach((wk) => {

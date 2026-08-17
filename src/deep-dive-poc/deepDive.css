@@ -780,6 +780,38 @@
   color: #7a8294;
 }
 
+/* ── shimmer placeholder row (shown while a node's next level loads) ────── */
+.dd-grid .dd-shimmer-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  height: 100%;
+  padding-right: 16px;
+  box-sizing: border-box;
+}
+.dd-grid .dd-shimmer-bar {
+  height: 12px;
+  flex: 1;
+  max-width: 120px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #eef1f5 25%, #dfe4ea 37%, #eef1f5 63%);
+  background-size: 400% 100%;
+  animation: dd-shimmer 1.2s ease-in-out infinite;
+}
+.dd-grid .dd-shimmer-bar--label {
+  max-width: 200px;
+  flex: 0 0 200px;
+}
+@keyframes dd-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
 /* Make ag-Grid menus / dropdowns readable */
 .ag-menu,
 .ag-popup .ag-menu,
@@ -1210,6 +1242,16 @@
   border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
 }
 
+/* Server-driven grid: the pinned Product/Location + Measure/Metric label
+   columns draw their horizontal separator only at their OWN group boundary
+   (marked with `.dd-rowsep`), so an outer dim (Product/Measure) merges across
+   its inner rows while the leaf dim (Metric) separates every row — matching the
+   reference. The strip rule above clears all borders in `.dd-manual`; this wins
+   via higher specificity. */
+.dd-grid.dd-manual .ag-row .ag-cell.dd-rowsep {
+  border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
+}
+
 /* ──────────────────────────────────────────────────────────────
    Figma table styling
    • Value cells are plain (no inner card/box), right-aligned, separated by
@@ -1224,21 +1266,32 @@
 }
 
 /* Plain value cells: value fills the cell (no inner card/box), right-aligned,
-   separated by light column grid lines. Every value column carries a faint
-   left gridline (matching ux-cypher's full spreadsheet grid); group boundaries
-   upgrade to the stronger --border line via .dd-grp-start below. */
+   white background with a horizontal row line. The vertical week separators are
+   drawn as a right border on the leaf cells (see .dd-num-cell rule below). */
 .dd-grid .ag-cell.ag-right-aligned-cell,
 .dd-grid.dd-manual .ag-row .ag-cell.ag-right-aligned-cell {
   background-color: #ffffff !important;
   border: none !important;
-  border-right: none !important;
-  border-left: 1px solid #eef0f4 !important;
+  border-left: none !important;
   border-bottom: 1px solid var(--ag-border-color, #dde2eb) !important;
   box-shadow: none;
   border-radius: 0;
   display: flex !important;
   align-items: center;
   justify-content: flex-end;
+}
+
+/* Full spreadsheet grid on every value leaf cell (dd-num-cell): a right border
+   separates each week/metric column (vertical), and a bottom border draws a
+   horizontal line below every row. Keyed on `dd-num-cell` (always present on
+   value cells) rather than the numericColumn `ag-right-aligned-cell` class,
+   which isn't applied here. `.dd-grid .ag-cell` disables the default cell
+   border-right and the `.dd-manual` strip rule clears top/bottom borders, so
+   this higher-specificity rule (with !important) re-enables both. */
+.dd-grid .ag-cell.dd-num-cell,
+.dd-grid.dd-manual .ag-row .ag-cell.dd-num-cell {
+  border-right: 1px solid var(--ag-border-color, #d9dde7) !important;
+  border-bottom: 1px solid var(--ag-border-color, #d9dde7) !important;
 }
 
 .dd-grid .ag-right-aligned-cell .ag-cell-value {
